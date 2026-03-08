@@ -1,0 +1,26 @@
+@import url('https://fonts.googleapis.com/css2?family=Syne:wght@700;900&family=DM+Sans:ital,wght@0,400;0,600;1,400&family=JetBrains+Mono:wght@400;700&display=swap');
+
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html, body, #root {
+  min-height: 100vh;
+  background: #020617;
+  color: #f1f5f9;
+  font-family: 'DM Sans', 'Segoe UI', sans-serif;
+}
+
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: #0f172a; }
+::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 99px; }
+
+button { transition: opacity 0.15s, transform 0.15s; cursor: pointer; }
+button:hover { opacity: 0.85; }
+button:active { transform: scale(0.97); }
+
+input, button { font-family: inherit; }
+
+::selection { background: rgba(99,102,241,0.35); color: #f1f5f9; }
