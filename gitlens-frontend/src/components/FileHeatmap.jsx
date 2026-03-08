@@ -1,9 +1,14 @@
+// React hook for component state
 import { useState } from 'react'
+// Utility function that returns a color based on risk level
 import { getRiskColor } from '../utils/constants.js'
 
 export default function FileHeatmap({ files }) {
   const [sort, setSort] = useState('changes')
+   // Sort files dynamically based on selected metric
   const sorted = [...files].sort((a, b) => b[sort] - a[sort])
+  // Determine maximum value to normalize heatmap bar width
+
   const maxV   = Math.max(...sorted.map(f => f[sort]), 1)
 
   return (
