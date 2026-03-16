@@ -1,3 +1,4 @@
+//This component displays a grid of commit cards, showing the most recent 80 commits with their message, author, date, and a color-coded indicator for the contributor. Users can click on any card to jump to that commit in the timeline. The cards are styled to indicate the current commit and the active range of commits up to the current index. The component also includes a header with instructions and information about the displayed commits.
 import { PALETTE } from '../utils/constants.js'
 
 export default function CommitGrid({ commits, currentIdx, onSeek, contributors }) {
