@@ -1,3 +1,4 @@
+//MAIN ENTRY POINT IN FRONTEND
 import { useState } from 'react'
 import { loadRepo, parseRepoUrl } from '../utils/github.js'
 import { MOCK } from '../utils/mockData.js'

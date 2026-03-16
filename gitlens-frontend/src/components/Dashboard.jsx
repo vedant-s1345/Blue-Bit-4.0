@@ -1,5 +1,7 @@
+// React hooks
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { getAuthorColor, fmtDate } from '../utils/constants.js'
+// Visualization components
 import TimelineBars   from './TimelineBars.jsx'
 import CommitGrid     from './CommitGrid.jsx'
 import FileHeatmap    from './FileHeatmap.jsx'
