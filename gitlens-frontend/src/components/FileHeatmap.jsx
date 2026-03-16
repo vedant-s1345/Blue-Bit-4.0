@@ -1,4 +1,6 @@
+//this overall dashboard which contain all features like file heatmap, galaxy, timeline etc
 import { useState, useMemo } from 'react'
+
 import { getRiskColor } from '../utils/constants.js'
 
 // Given a fileActivity map, compute churn scores filtered by a date window
