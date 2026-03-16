@@ -4,7 +4,6 @@ import { getAuthorColor, fmtDate } from '../utils/constants.js'
 import FilterBar from './FilterBar'
 import HallOfFame from './HallOfFame'
 //imports for icons 
-import { Clapperboard } from "lucide-react"
 import { GalleryVerticalEnd } from "lucide-react"
 import { Radio } from "lucide-react"
 import { Clock2 } from "lucide-react"
@@ -19,13 +18,58 @@ import DayHourHeatmap from './DayHourHeatmap.jsx'
 import Galaxy         from './Galaxy.jsx'
 import AIInsights     from './AIInsights.jsx'
 
+// icon tabs for timeline, file hotspots, day×hour, contributors, project movie, and AI insights
 const TABS = [
-  { id: 'timeline', label: '🎬 Timeline'      },
-  { id: 'hotspot',  label: '🔥 File Hotspots' },
-  { id: 'dayhour',  label: '⏰ Day × Hour'    },
-  { id: 'galaxy',   label: '🌌 Contributors'  },
-  { id: 'insights', label: '🤖 AI Insights'   },
-  { id: 'halloffame', label: '🏆 Hall of Fame' },
+  //{ id: 'timeline', label: '🎬 Timeline' },
+  {
+  id: 'timeline',
+  label: (
+    <span style={{display:'flex',alignItems:'center',gap:6}}>
+      <GalleryVerticalEnd size={18} className="timelineIcon"/>
+      Timeline
+    </span>
+  )
+},
+ // { id: 'hotspot',  label: '🔥 File Hotspots' },
+ {
+  id: 'hotspot',
+  label: (
+    <span style={{display:'flex',alignItems:'center',gap:6}}>
+      <Radio size={18} className="hotspotIcon"/>
+      File Hotspots
+    </span>
+  )
+},
+  //{ id: 'dayhour',  label: '⏰ Day × Hour' },
+  {
+  id: 'dayhour',
+  label: (
+    <span style={{display:'flex',alignItems:'center',gap:6}}>
+      <Clock2 size={18} className="dayHourIcon"/>
+      Day × Hour
+    </span>
+  )
+},
+ // { id: 'galaxy',   label: '🌌 Contributors' },
+ {
+  id: 'galaxy',
+  label: (
+    <span style={{display:'flex',alignItems:'center',gap:6}}>
+      <UserRound size={18} className="contributorIcon"/>
+      Contributors
+    </span>
+  )
+},
+ // { id: 'insights', label: '🤖 AI Insights' },
+ {
+  id: 'insights',
+  label: (
+    <span style={{display:'flex',alignItems:'center',gap:6}}>
+      <Bot size={18} className="aiIcon"/>
+      AI Insights
+    </span>
+  )
+}
 ]
 
 export default function Dashboard({ data, onReset }) {
