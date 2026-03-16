@@ -1,3 +1,4 @@
+// This is the main dashboard component that integrates all the features and visualizations. It manages the state for filters, playback, and the current commit index, and renders the header, filter bar, player controls, tabs, and panels. It also handles the logic for filtering commits based on user input, playing through the commit history, and opening the commit detail modal. The dashboard is designed to be responsive and visually cohesive, with a consistent style and color scheme throughout the various components and visualizations. It serves as the central hub for users to explore their repository's history and insights in an interactive and engaging way.
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { getAuthorColor, fmtDate } from '../utils/constants.js'
 
