@@ -1,3 +1,4 @@
+// This component visualizes the commit graph with branches and merges, using a custom canvas-based rendering for performance and flexibility. It builds the graph structure from commit and branch data, assigns lanes to branches, and draws nodes and edges with interactive hover effects. Users can filter by branch and see tooltips with commit details. The visualization adapts to both GitHub direct flow (with parent data) and backend flow (without parent data) gracefully.
 import { useEffect, useRef, useState, useCallback, useMemo } from 'react'
 import { PALETTE } from '../utils/constants.js'
 
