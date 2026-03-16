@@ -4,7 +4,7 @@ import { PALETTE } from '../utils/constants.js'
 const W = 560, H = 380
 const cx = W / 2, cy = H / 2
 
-// ─── ORBIT NETWORK (canvas) ──────────────────────────────────────────────────
+// ORBIT network(canvas)
 function OrbitCanvas({ contributors, edges, selectedAuthor, onSelect }) {
   const ref = useRef()
   const af  = useRef()
