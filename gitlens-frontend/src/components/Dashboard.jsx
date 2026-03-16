@@ -1,6 +1,8 @@
 // React hooks
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { getAuthorColor, fmtDate } from '../utils/constants.js'
+import FilterBar from './FilterBar'
+import HallOfFame from './HallOfFame'
 // Visualization components
 import TimelineBars   from './TimelineBars.jsx'
 import CommitGrid     from './CommitGrid.jsx'
@@ -15,6 +17,7 @@ const TABS = [
   { id: 'dayhour',  label: '⏰ Day × Hour'    },
   { id: 'galaxy',   label: '🌌 Contributors'  },
   { id: 'insights', label: '🤖 AI Insights'   },
+  { id: 'halloffame', label: '🏆 Hall of Fame' },
 ]
 
 export default function Dashboard({ data, onReset }) {
@@ -23,28 +26,49 @@ export default function Dashboard({ data, onReset }) {
   const [playing, setPlaying] = useState(false)
   const [idx,     setIdx]     = useState(0)
   const [tab,     setTab]     = useState('timeline')
+  const [filters, setFilters] = useState({
+    author: "all",
+    keyword: "",
+    timeRange: "all"
+  })
   const playRef = useRef()
+
+  // Filtered commits based on active filters
+  const filteredCommits = useMemo(() => {
+    return commits.filter(commit => {
+      const author = commit?.author?.login || commit?.commit?.author?.name
+      if (filters.author !== "all" && author !== filters.author) return false
+      if (filters.keyword && !commit.commit?.message?.toLowerCase().includes(filters.keyword.toLowerCase())) return false
+      if (filters.timeRange === "6months") {
+        const limit = new Date()
+        limit.setMonth(limit.getMonth() - 6)
+        const commitDate = new Date(commit.commit?.author?.date)
+        if (commitDate < limit) return false
+      }
+      return true
+    })
+  }, [commits, filters])
 
   const togglePlay = useCallback(() => {
     setPlaying(p => {
-      if (!p && idx >= commits.length - 1) setIdx(0)
+      if (!p && idx >= filteredCommits.length - 1) setIdx(0)
       return !p
     })
-  }, [idx, commits.length])
+  }, [idx, filteredCommits.length])
 
   useEffect(() => {
     if (playing) {
       playRef.current = setInterval(() => {
         setIdx(i => {
-          if (i >= commits.length - 1) { setPlaying(false); return i }
+          if (i >= filteredCommits.length - 1) { setPlaying(false); return i }
           return i + 1
         })
       }, 380)
     }
     return () => clearInterval(playRef.current)
-  }, [playing, commits.length])
+  }, [playing, filteredCommits.length])
 
-  const commit      = commits[idx]
+  const commit = filteredCommits[idx]
   const authorLogin = commit?.author?.login || commit?.commit?.author?.name || 'unknown'
   const authorColor = getAuthorColor(authorLogin, contributors)
   const commitDate  = commit && new Date(commit.commit?.author?.date)
@@ -75,7 +99,13 @@ export default function Dashboard({ data, onReset }) {
       </header>
 
       <div style={S.content}>
-        {/* Player */}
+
+        <FilterBar
+          filters={filters}
+          setFilters={setFilters}
+          authors={contributors.map(c => c.login)}
+        />   
+       {/* Player */}
         <div style={S.player}>
           <div style={S.controls}>
             <button onClick={togglePlay} style={{ ...S.playBtn, background: playing ? 'rgba(239,68,68,0.2)' : 'linear-gradient(135deg,#6366f1,#8b5cf6)', borderColor: playing ? '#ef4444' : '#6366f1' }}>
@@ -99,9 +129,14 @@ export default function Dashboard({ data, onReset }) {
                 </div>
               </div>
             )}
-            <div style={S.counter}>{idx + 1} / {commits.length}</div>
+            <div style={S.counter}>{idx + 1} / {filteredCommits.length}</div>
           </div>
-          <TimelineBars commits={commits} currentIdx={idx} onSeek={setIdx} contributors={contributors} />
+            <TimelineBars
+                        commits={filteredCommits}
+                        currentIdx={idx}
+                        onSeek={setIdx}
+                        contributors={contributors}
+                      />
         </div>
 
         {/* Tabs */}
@@ -121,7 +156,7 @@ export default function Dashboard({ data, onReset }) {
         {/* Panels */}
         <div style={S.panel}>
           {tab === 'timeline' && (
-            <CommitGrid commits={commits} currentIdx={idx} onSeek={setIdx} contributors={contributors} />
+            <CommitGrid commits={filteredCommits} currentIdx={idx} onSeek={setIdx} contributors={contributors} />
           )}
           {tab === 'hotspot' && (
             fileList.length > 0
@@ -134,7 +169,17 @@ export default function Dashboard({ data, onReset }) {
               ? <Galaxy contributors={contributors} edges={collabEdges} commits={commits} />
               : <Empty msg="No contributor data available" />
           )}
-          {tab === 'insights' && <AIInsights data={data} />}
+          {tab === 'insights' && (
+            <AIInsights data={data} />
+          )}
+
+          {tab === 'halloffame' && (
+            <HallOfFame
+              commits={commits}
+              contributors={contributors}
+            />
+          )}
+
         </div>
       </div>
     </div>
