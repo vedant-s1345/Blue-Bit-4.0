@@ -1,11 +1,14 @@
 package com.gitlens.backend.model;
 
 import jakarta.persistence.*;
+import jakarta.persistence.UniqueConstraint;
 import java.time.LocalDateTime;
 import java.util.List;
 
 @Entity
-@Table(name = "repositories")
+@Table(name = "repositories", uniqueConstraints = {
+	    @UniqueConstraint(columnNames = "url")
+	})
 public class Repository {
 
     @Id

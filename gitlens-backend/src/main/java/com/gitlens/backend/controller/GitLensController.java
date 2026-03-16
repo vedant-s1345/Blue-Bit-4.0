@@ -46,10 +46,25 @@ public class GitLensController {
         // Check if already analyzed
         var existing = repositoryRepo.findByUrl(request.getRepoUrl());
         if (existing.isPresent()) {
+            String currentStatus = existing.get().getStatus();
+
+            // If FAILED, reset and allow re-analysis
+            if ("FAILED".equals(currentStatus)) {
+                existing.get().setStatus("PENDING");
+                repositoryRepo.save(existing.get());
+                gitParserService.parseRepository(existing.get().getId());
+                return ResponseEntity.ok(Map.of(
+                    "message", "Re-analysis started for previously failed repository",
+                    "repositoryId", existing.get().getId(),
+                    "status", "PENDING"
+                ));
+            }
+
+            // If already COMPLETED or PROCESSING, just return current state
             return ResponseEntity.ok(Map.of(
                 "message", "Repository already exists",
                 "repositoryId", existing.get().getId(),
-                "status", existing.get().getStatus()
+                "status", currentStatus
             ));
         }
 
@@ -57,21 +72,35 @@ public class GitLensController {
         String url = request.getRepoUrl();
         String repoName = url.substring(url.lastIndexOf("/") + 1).replace(".git", "");
 
-        // Save repo entry
-        Repository repo = new Repository();
-        repo.setUrl(url);
-        repo.setName(repoName);
-        repo.setStatus("PENDING");
-        repositoryRepo.save(repo);
+     // Save repo entry
+        try {
+            Repository repo = new Repository();
+            repo.setUrl(url);
+            repo.setName(repoName);
+            repo.setStatus("PENDING");
+            repositoryRepo.save(repo);
 
-        // Trigger async parsing
-        gitParserService.parseRepository(repo.getId());
+            // Trigger async parsing
+            gitParserService.parseRepository(repo.getId());
 
-        return ResponseEntity.ok(Map.of(
-            "message", "Analysis started",
-            "repositoryId", repo.getId(),
-            "status", "PENDING"
-        ));
+            return ResponseEntity.ok(Map.of(
+                "message", "Analysis started",
+                "repositoryId", repo.getId(),
+                "status", "PENDING"
+            ));
+        } catch (Exception e) {
+            // Handles rare race condition where two requests sneak past the duplicate check
+            var raceConditionRepo = repositoryRepo.findByUrl(url);
+            if (raceConditionRepo.isPresent()) {
+                return ResponseEntity.ok(Map.of(
+                    "message", "Repository already exists",
+                    "repositoryId", raceConditionRepo.get().getId(),
+                    "status", raceConditionRepo.get().getStatus()
+                ));
+            }
+            return ResponseEntity.internalServerError()
+                    .body(Map.of("error", "Failed to start analysis: " + e.getMessage()));
+        }
     }
 
     // GET /api/status/{id} — check analysis progress

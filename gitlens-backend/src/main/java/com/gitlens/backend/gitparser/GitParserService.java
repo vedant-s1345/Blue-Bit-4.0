@@ -1,6 +1,7 @@
 package com.gitlens.backend.gitparser;
 
 import com.gitlens.backend.model.*;
+
 import com.gitlens.backend.repository.*;
 import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.diff.DiffEntry;
@@ -14,13 +15,14 @@ import org.eclipse.jgit.treewalk.CanonicalTreeParser;
 import org.eclipse.jgit.treewalk.EmptyTreeIterator;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
-
+import org.springframework.transaction.annotation.Transactional;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.List;
 import java.util.logging.Logger;
+import java.util.ArrayList;
 
 @Service
 public class GitParserService {
@@ -102,8 +104,9 @@ public class GitParserService {
         }
     }
 
-    private void processCommit(Git git, RevCommit revCommit, Repository repo) {
-        try {
+    @Transactional
+    protected void processCommit(Git git, RevCommit revCommit, Repository repo) {
+    	try {
         	if (commitRepo.existsByCommitHashAndRepositoryId(
                     revCommit.getName(), repo.getId())) {
                 return;
@@ -142,6 +145,9 @@ public class GitParserService {
             int totalAdded = 0;
             int totalDeleted = 0;
 
+            List<GitFile> gitFilesToSave = new ArrayList<>();
+            List<FileChange> fileChangesToSave = new ArrayList<>();
+
             for (DiffEntry diff : diffs) {
                 String filePath = diff.getNewPath().equals("/dev/null")
                         ? diff.getOldPath() : diff.getNewPath();
@@ -165,7 +171,8 @@ public class GitParserService {
 
                 gitFile.setChurnScore(gitFile.getChurnScore() + added + deleted);
                 gitFile.setCommitCount(gitFile.getCommitCount() + 1);
-                gitFileRepo.save(gitFile);
+                
+                gitFilesToSave.add(gitFile);
 
                 FileChange fileChange = new FileChange();
                 fileChange.setCommit(commit);
@@ -173,12 +180,15 @@ public class GitParserService {
                 fileChange.setLinesAdded(added);
                 fileChange.setLinesDeleted(deleted);
                 fileChange.setChangeType(diff.getChangeType().name());
-                fileChangeRepo.save(fileChange);
+                fileChangesToSave.add(fileChange);
 
                 totalAdded += added;
                 totalDeleted += deleted;
             }
 
+            gitFileRepo.saveAll(gitFilesToSave);
+            fileChangeRepo.saveAll(fileChangesToSave);
+            
             commit.setLinesAdded(totalAdded);
             commit.setLinesDeleted(totalDeleted);
             commitRepo.save(commit);
@@ -243,8 +253,9 @@ public class GitParserService {
             double churnNorm = maxChurn > 0 ? (double) file.getChurnScore() / maxChurn : 0;
             double commitNorm = maxCommits > 0 ? (double) file.getCommitCount() / maxCommits : 0;
             file.setHotspotScore((churnNorm + commitNorm) / 2.0 * 100);
-            gitFileRepo.save(file);
         }
+
+        gitFileRepo.saveAll(files);
     }
 
     private void deleteDirectory(File dir) {

@@ -42,39 +42,58 @@ public class AiInsightService {
     public AiInsightDTO generateInsights(Long repoId) throws Exception {
         List<HeatmapDTO> hotspots = analyticsService.getHeatmap(repoId);
         List<ContributorDTO> contributors = analyticsService.getContributors(repoId);
-        long totalCommits = commitRepo.countByRepositoryId(repoId);
+        List<Commit> commits = commitRepo.findByRepositoryIdOrderByCommitDateAsc(repoId);
 
-        long highRiskCount = hotspots.stream()
-                .filter(h -> "HIGH".equals(h.getRisk())).count();
+        // Try Gemini first; fall back to rule-based if key is missing or call fails
+        if (geminiApiKey != null && !geminiApiKey.isBlank() && !geminiApiKey.equals("YOUR_KEY_HERE")) {
+            try {
+                String prompt = buildPrompt(commits, hotspots, contributors);
+                String aiResponse = callGemini(prompt);
+                return parseResponse(aiResponse);
+            } catch (Exception e) {
+                // log and fall through to fallback
+            }
+        }
 
-        String topContributor = contributors.isEmpty() ? "Unknown"
-                : contributors.get(0).getName();
-
-        AiInsightDTO dto = new AiInsightDTO();
-
-        dto.setSummary("This repository has " + totalCommits +
-                " commits from " + contributors.size() +
-                " contributors. Development activity shows " +
-                highRiskCount + " high-risk files requiring attention.");
-
-        dto.setTechnicalDebt(highRiskCount > 0
-                ? "Found " + highRiskCount + " high-churn files indicating technical debt. " +
-                  "Files with hotspot score above 66 need refactoring."
-                : "No significant technical debt detected. Codebase appears stable.");
-
-        dto.setBusFactorWarning(contributors.size() <= 2
-                ? "WARNING: Only " + contributors.size() +
-                  " contributor(s) detected. High bus factor risk — " +
-                  "knowledge is concentrated in too few developers."
-                : "Bus factor is acceptable with " + contributors.size() +
-                  " contributors. Top contributor: " + topContributor + ".");
-
-        dto.setRecommendations("Focus code reviews on high-churn files. " +
-                "Encourage knowledge sharing across the team. " +
-                "Add tests for files with hotspot score above 80.");
-
-        return dto;
+        // Rule-based fallback
+        return buildFallbackInsights(hotspots, contributors, commits.size());
     }
+    
+    private AiInsightDTO buildFallbackInsights(List<HeatmapDTO> hotspots,
+										            List<ContributorDTO> contributors,
+										            int totalCommits) {
+		long highRiskCount = hotspots.stream()
+					.filter(h -> "HIGH".equals(h.getRisk())).count();
+		
+		String topContributor = contributors.isEmpty() ? "Unknown"
+						: contributors.get(0).getName();
+		
+		AiInsightDTO dto = new AiInsightDTO();
+		
+		dto.setSummary("This repository has " + totalCommits +
+						" commits from " + contributors.size() +
+						" contributors. Development activity shows " +
+						highRiskCount + " high-risk files requiring attention.");
+		
+		dto.setTechnicalDebt(highRiskCount > 0
+								? "Found " + highRiskCount + " high-churn files indicating technical debt. " +
+								"Files with hotspot score above 66 need refactoring."
+								: "No significant technical debt detected. Codebase appears stable.");
+		
+		dto.setBusFactorWarning(contributors.size() <= 2
+								? "WARNING: Only " + contributors.size() +
+								" contributor(s) detected. High bus factor risk."
+								: "Bus factor is acceptable with " + contributors.size() +
+								" contributors. Top contributor: " + topContributor + ".");
+		
+		dto.setRecommendations("Focus code reviews on high-churn files. " +
+								"Encourage knowledge sharing across the team. " +
+								"Add tests for files with hotspot score above 80.");
+		
+		return dto;
+	}
+    
+    
 
 
     private String buildPrompt(List<Commit> commits, List<HeatmapDTO> hotspots,
