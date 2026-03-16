@@ -23,6 +23,7 @@ public class AiInsightService {
 
     @Value("${gemini.api.key}")
     private String geminiApiKey;
+    private static final HttpClient httpClient = HttpClient.newHttpClient();
 
     private final CommitRepo commitRepo;
     private final GitFileRepo gitFileRepo;
@@ -158,14 +159,13 @@ public class AiInsightService {
                 }
                 """.formatted(new Gson().toJson(prompt));
 
-        HttpClient client = HttpClient.newHttpClient();
         HttpRequest request = HttpRequest.newBuilder()
                 .uri(URI.create(url))
                 .header("Content-Type", "application/json")
                 .POST(HttpRequest.BodyPublishers.ofString(requestBody))
                 .build();
 
-        HttpResponse<String> response = client.send(request,
+        HttpResponse<String> response = httpClient.send(request,
                 HttpResponse.BodyHandlers.ofString());
 
         if (response.statusCode() != 200) {

@@ -21,14 +21,15 @@ import java.io.File;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.List;
-import java.util.logging.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import java.util.ArrayList;
 
 @Service
 public class GitParserService {
 
-    private static final Logger log = Logger.getLogger(GitParserService.class.getName());
-
+	private static final Logger log = LoggerFactory.getLogger(GitParserService.class);
+	
     private final RepositoryRepo repositoryRepo;
     private final CommitRepo commitRepo;
     private final GitFileRepo gitFileRepo;
@@ -58,8 +59,8 @@ public class GitParserService {
         String localPath = System.getProperty("java.io.tmpdir") + "/gitlens/" + repositoryId;
 
         try {
-            log.info("Cloning repository: " + repo.getUrl());
-
+        	log.info("Cloning repository: {}", repo.getUrl());
+        	
             Git git = Git.cloneRepository()
                     .setURI(repo.getUrl())
                     .setDirectory(new File(localPath))
@@ -72,15 +73,18 @@ public class GitParserService {
             try {
                 revCommits = git.log().all().call();
             } catch (Exception logEx) {
-                log.warning("git.log() failed: " + logEx.getMessage() + " | Cause: " + (logEx.getCause() != null ? logEx.getCause().getMessage() : "none") + " | Class: " + logEx.getClass().getName());
-                revCommits = java.util.Collections.emptyList();
+            	log.warn("git.log() failed: {} | Cause: {} | Class: {}",
+            	        logEx.getMessage(),
+            	        logEx.getCause() != null ? logEx.getCause().getMessage() : "none",
+            	        logEx.getClass().getName());
+            	revCommits = java.util.Collections.emptyList();
             }
             
             for (RevCommit revCommit : revCommits) {
                 try {
                     processCommit(git, revCommit, repo);
                 } catch (Exception e) {
-                    log.warning("Skipping problematic commit " + revCommit.getName() + ": " + e.getMessage());
+                	log.warn("Skipping problematic commit {}: {}", revCommit.getName(), e.getMessage());
                 }
             }
 
@@ -95,10 +99,13 @@ public class GitParserService {
             deleteDirectory(new File(localPath));
 
             log.info("Repository analysis complete! Total commits: " + totalCommits);
-
+            
         } catch (Exception e) {
-            log.severe("Failed to parse repository: " + e.getMessage() + " | Cause: " + (e.getCause() != null ? e.getCause().getMessage() : "none") + " | Class: " + e.getClass().getName());
-            repo.setStatus("FAILED");
+        	log.error("Failed to parse repository: {} | Cause: {} | Class: {}",
+        	        e.getMessage(),
+        	        e.getCause() != null ? e.getCause().getMessage() : "none",
+        	        e.getClass().getName());
+        	repo.setStatus("FAILED");
             repositoryRepo.save(repo);
             deleteDirectory(new File(localPath));
         }
@@ -198,7 +205,7 @@ public class GitParserService {
             contributorRepo.save(contributor);
 
         } catch (Exception e) {
-            log.warning("Skipping commit " + revCommit.getName() + ": " + e.getMessage());
+            log.warn("Skipping commit {}: {}", revCommit.getName(), e.getMessage());
         }
     }
 
@@ -221,8 +228,8 @@ public class GitParserService {
                     .setNewTree(newTree)
                     .call();
         } catch (Exception e) {
-            log.warning("Could not get diffs for commit " + commit.getName() + ": " + e.getMessage());
-            return List.of(); // skip this commit's diffs gracefully
+        	log.warn("Could not get diffs for commit {}: {}", commit.getName(), e.getMessage());
+        	return List.of(); 
         }
     }
 

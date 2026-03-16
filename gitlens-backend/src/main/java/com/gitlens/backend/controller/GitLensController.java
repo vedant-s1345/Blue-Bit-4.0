@@ -14,11 +14,6 @@ import java.util.Map;
 
 @RestController
 @RequestMapping("/api")
-@CrossOrigin(origins = {
-	    "http://localhost:5173",  // Vite default port
-	    "http://localhost:3000",  // Create React App default
-	    "http://localhost:4173"   // Vite preview port
-	})
 public class GitLensController {
 
     private final RepositoryRepo repositoryRepo;
