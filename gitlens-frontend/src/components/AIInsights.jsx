@@ -1,4 +1,6 @@
+// This component generates AI-driven insights based on commit data and contributor activity. It identifies key risks like bus factor, hotspots, and collaboration patterns, and presents them in an interactive card format. Each insight is color-coded by severity and can be expanded for more details. The component also includes a status header with real-time data indicators and prompts users to explore further analysis through the AI Chat feature.
 import { useState } from 'react'
+
 
 const COLORS = {
   critical: { bg: 'rgba(239,68,68,0.07)',   border: '#ef444430', text: '#f87171' },
