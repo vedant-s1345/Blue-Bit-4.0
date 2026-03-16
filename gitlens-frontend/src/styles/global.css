@@ -75,3 +75,53 @@ input, button { font-family: inherit; }
   border-radius: 8px;
   color: white;
 }
+
+
+.timelineIcon{
+transition:all 0.25s ease;
+}
+
+.timelineIcon:hover{
+transform:scale(1.25) rotate(10deg);
+filter:drop-shadow(0 0 8px #22c55e);
+}
+
+
+.hotspotIcon{
+transition:all 0.25s ease;
+}
+
+.hotspotIcon:hover{
+transform:scale(1.25);
+filter:drop-shadow(0 0 8px #f97316);
+}
+
+
+.dayHourIcon{
+transition:all 0.25s ease;
+}
+
+.dayHourIcon:hover{
+transform:scale(1.25) rotate(8deg);
+filter:drop-shadow(0 0 8px #22c55e);
+}
+
+
+.contributorIcon{
+transition:all 0.25s ease;
+}
+
+.contributorIcon:hover{
+transform:scale(1.25);
+filter:drop-shadow(0 0 8px #38bdf8);
+}
+
+
+.aiIcon{
+transition:all 0.25s ease;
+}
+
+.aiIcon:hover{
+transform:scale(1.25) rotate(10deg);
+filter:drop-shadow(0 0 8px #8b5cf6);
+}
