@@ -3,6 +3,14 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { getAuthorColor, fmtDate } from '../utils/constants.js'
 import FilterBar from './FilterBar'
 import HallOfFame from './HallOfFame'
+//imports for icons 
+import { Clapperboard } from "lucide-react"
+import { GalleryVerticalEnd } from "lucide-react"
+import { Radio } from "lucide-react"
+import { Clock2 } from "lucide-react"
+import { UserRound } from "lucide-react"
+import { Bot } from "lucide-react"
+ // imports till here 
 // Visualization components
 import TimelineBars   from './TimelineBars.jsx'
 import CommitGrid     from './CommitGrid.jsx'
