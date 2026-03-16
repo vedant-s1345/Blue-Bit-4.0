@@ -1,4 +1,6 @@
+//This feature show commits for particular file 
 import { useEffect, useState, useMemo } from 'react'
+
 
 // ── Extension → color family ──────────────────────────────────────────────────
 const EXT_COLOR = {
