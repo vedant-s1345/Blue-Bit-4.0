@@ -1,6 +1,7 @@
 package com.gitlens.backend.gitparser;
 
 import com.gitlens.backend.model.*;
+import org.springframework.beans.factory.annotation.Value;
 
 import com.gitlens.backend.repository.*;
 import org.eclipse.jgit.api.Git;
@@ -24,12 +25,15 @@ import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import java.util.ArrayList;
+import java.nio.file.Files;
+import java.nio.file.Path;
 
 @Service
 public class GitParserService {
 
 	private static final Logger log = LoggerFactory.getLogger(GitParserService.class);
-	
+	@Value("${github.token:}")
+	private String githubToken;
     private final RepositoryRepo repositoryRepo;
     private final CommitRepo commitRepo;
     private final GitFileRepo gitFileRepo;
@@ -48,7 +52,7 @@ public class GitParserService {
         this.contributorRepo = contributorRepo;
     }
 
-    @Async
+    @Async("gitParserExecutor")
     public void parseRepository(Long repositoryId) {
         Repository repo = repositoryRepo.findById(repositoryId)
                 .orElseThrow(() -> new RuntimeException("Repository not found"));
@@ -59,13 +63,25 @@ public class GitParserService {
         String localPath = System.getProperty("java.io.tmpdir") + "/gitlens/" + repositoryId;
 
         try {
+        	
+        	deleteDirectory(new File(localPath));
         	log.info("Cloning repository: {}", repo.getUrl());
         	
-            Git git = Git.cloneRepository()
-                    .setURI(repo.getUrl())
-                    .setDirectory(new File(localPath))
-                    .setCloneAllBranches(true)
-                    .call();
+        	var cloneCommand = Git.cloneRepository()
+        	        .setURI(repo.getUrl())
+        	        .setDirectory(new File(localPath))
+        	        .setCloneAllBranches(true);
+
+        	// Add auth if token is configured
+        	if (githubToken != null && !githubToken.isBlank()) {
+        	    cloneCommand.setCredentialsProvider(
+        	        new org.eclipse.jgit.transport.UsernamePasswordCredentialsProvider(
+        	            githubToken, ""
+        	        )
+        	    );
+        	}
+
+        	Git git = cloneCommand.call();
 
             log.info("Clone complete. Parsing commits...");
 
@@ -119,6 +135,7 @@ public class GitParserService {
                 return;
             }
             PersonIdent author = revCommit.getAuthorIdent();
+            PersonIdent committer = revCommit.getCommitterIdent();
 
             Contributor contributor = contributorRepo
                     .findByEmailAndRepositoryId(author.getEmailAddress(), repo.getId())
@@ -141,7 +158,7 @@ public class GitParserService {
             commit.setAuthor(author.getName());
             commit.setAuthorEmail(author.getEmailAddress());
             commit.setMessage(revCommit.getShortMessage());
-            commit.setCommitDate(author.getWhenAsInstant()
+            commit.setCommitDate(committer.getWhenAsInstant()
                     .atZone(ZoneId.systemDefault()).toLocalDateTime());
             commit.setLinesAdded(0);
             commit.setLinesDeleted(0);
@@ -188,7 +205,7 @@ public class GitParserService {
                 fileChange.setLinesDeleted(deleted);
                 fileChange.setChangeType(diff.getChangeType().name());
                 fileChangesToSave.add(fileChange);
-
+                
                 totalAdded += added;
                 totalDeleted += deleted;
             }
@@ -257,24 +274,41 @@ public class GitParserService {
         int maxCommits = files.stream().mapToInt(GitFile::getCommitCount).max().orElse(1);
 
         for (GitFile file : files) {
+            // Hotspot score
             double churnNorm = maxChurn > 0 ? (double) file.getChurnScore() / maxChurn : 0;
             double commitNorm = maxCommits > 0 ? (double) file.getCommitCount() / maxCommits : 0;
             file.setHotspotScore((churnNorm + commitNorm) / 2.0 * 100);
+
+            // Bug #12: calculate bus factor here in bulk, not inside the commit loop
+            long distinctContributors = fileChangeRepo
+                    .countDistinctContributorsByGitFileId(file.getId());
+            file.setBusFactor((int) distinctContributors);
         }
 
+        // Single batch write
         gitFileRepo.saveAll(files);
     }
 
     private void deleteDirectory(File dir) {
-        if (dir.exists()) {
-            File[] files = dir.listFiles();
-            if (files != null) {
-                for (File f : files) {
-                    if (f.isDirectory()) deleteDirectory(f);
-                    else f.delete();
+        try {
+            Files.walkFileTree(dir.toPath(), new java.nio.file.SimpleFileVisitor<Path>() {
+                @Override
+                public java.nio.file.FileVisitResult visitFile(Path file,
+                        java.nio.file.attribute.BasicFileAttributes attrs) throws java.io.IOException {
+                    Files.delete(file);
+                    return java.nio.file.FileVisitResult.CONTINUE;
                 }
-            }
-            dir.delete();
+
+                @Override
+                public java.nio.file.FileVisitResult postVisitDirectory(Path d, java.io.IOException e)
+                        throws java.io.IOException {
+                    if (e != null) throw e;
+                    Files.delete(d);
+                    return java.nio.file.FileVisitResult.CONTINUE;
+                }
+            });
+        } catch (java.io.IOException e) {
+            log.warn("Failed to clean up temp directory {}: {}", dir.getAbsolutePath(), e.getMessage());
         }
     }
 }

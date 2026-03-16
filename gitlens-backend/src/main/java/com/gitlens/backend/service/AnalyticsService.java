@@ -1,6 +1,10 @@
 package com.gitlens.backend.service;
 
 import com.gitlens.backend.dto.*;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.Pageable;
+import java.util.stream.Collectors;
 import com.gitlens.backend.model.*;
 import com.gitlens.backend.repository.*;
 import org.springframework.stereotype.Service;
@@ -44,18 +48,25 @@ public class AnalyticsService {
     public List<CommitDTO> getTimeline(Long repoId) {
         return commitRepo.findByRepositoryIdOrderByCommitDateAsc(repoId)
                 .stream()
-                .map(commit -> {
-                    CommitDTO dto = new CommitDTO();
-                    dto.setCommitHash(commit.getCommitHash());
-                    dto.setAuthor(commit.getAuthor());
-                    dto.setAuthorEmail(commit.getAuthorEmail());
-                    dto.setMessage(commit.getMessage());
-                    dto.setCommitDate(commit.getCommitDate() != null ? commit.getCommitDate().toString() : null);
-                    dto.setLinesAdded(commit.getLinesAdded());
-                    dto.setLinesDeleted(commit.getLinesDeleted());
-                    return dto;
-                })
+                .map(this::toCommitDTO)
                 .collect(Collectors.toList());
+    }
+
+    public Page<CommitDTO> getTimelinePaged(Long repoId, Pageable pageable) {
+        return commitRepo.findByRepositoryIdOrderByCommitDateAsc(repoId, pageable)
+                .map(this::toCommitDTO);
+    }
+
+    private CommitDTO toCommitDTO(com.gitlens.backend.model.Commit commit) {
+        CommitDTO dto = new CommitDTO();
+        dto.setCommitHash(commit.getCommitHash());
+        dto.setAuthor(commit.getAuthor());
+        dto.setAuthorEmail(commit.getAuthorEmail());
+        dto.setMessage(commit.getMessage());
+        dto.setCommitDate(commit.getCommitDate() != null ? commit.getCommitDate().toString() : null);
+        dto.setLinesAdded(commit.getLinesAdded());
+        dto.setLinesDeleted(commit.getLinesDeleted());
+        return dto;
     }
 
     public List<HeatmapDTO> getHeatmap(Long repoId) {

@@ -8,6 +8,9 @@ import com.gitlens.backend.service.AnalyticsService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import com.gitlens.backend.service.AiInsightService;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.web.PageableDefault;
 
 import java.util.List;
 import java.util.Map;
@@ -34,9 +37,15 @@ public class GitLensController {
     // POST /api/analyze — submit a repo URL for analysis
     @PostMapping("/analyze")
     public ResponseEntity<?> analyzeRepo(@RequestBody RepoSubmitRequest request) {
-        if (request.getRepoUrl() == null || request.getRepoUrl().isBlank()) {
-            return ResponseEntity.badRequest().body(Map.of("error", "repoUrl is required"));
-        }
+    	if (request.getRepoUrl() == null || request.getRepoUrl().isBlank()) {
+    	    return ResponseEntity.badRequest().body(Map.of("error", "repoUrl is required"));
+    	}
+
+    	if (!isValidGitUrl(request.getRepoUrl())) {
+    	    return ResponseEntity.badRequest().body(Map.of(
+    	        "error", "Invalid Git URL. Must be a valid GitHub, GitLab, Bitbucket, or Azure DevOps URL."
+    	    ));
+    	}
 
         // Check if already analyzed
         var existing = repositoryRepo.findByUrl(request.getRepoUrl());
@@ -110,8 +119,10 @@ public class GitLensController {
 
     // GET /api/timeline/{id} — get commit timeline
     @GetMapping("/timeline/{id}")
-    public ResponseEntity<List<CommitDTO>> getTimeline(@PathVariable Long id) {
-        return ResponseEntity.ok(analyticsService.getTimeline(id));
+    public ResponseEntity<Page<CommitDTO>> getTimeline(
+            @PathVariable Long id,
+            @PageableDefault(size = 50, sort = "commitDate") Pageable pageable) {
+        return ResponseEntity.ok(analyticsService.getTimelinePaged(id, pageable));
     }
 
     // GET /api/heatmap/{id} — get file heatmap
@@ -135,5 +146,32 @@ public class GitLensController {
             return ResponseEntity.internalServerError()
                     .body(Map.of("error", e.getMessage()));
         }
+    }
+    
+    private boolean isValidGitUrl(String url) {
+        if (url == null || url.isBlank()) return false;
+
+        // Must start with a known Git protocol
+        boolean hasValidProtocol = url.startsWith("https://")
+                || url.startsWith("http://")
+                || url.startsWith("git@")
+                || url.startsWith("git://");
+
+        if (!hasValidProtocol) return false;
+
+        // Must be a parseable URI
+        try {
+            new java.net.URI(url);
+        } catch (Exception e) {
+            return false;
+        }
+
+        // Common Git hosts — extend this list as needed
+        boolean isKnownHost = url.contains("github.com")
+                || url.contains("gitlab.com")
+                || url.contains("bitbucket.org")
+                || url.contains("dev.azure.com");
+
+        return isKnownHost;
     }
 }

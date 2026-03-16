@@ -1,6 +1,8 @@
 //MAIN ENTRY POINT IN FRONTEND
 import { useState } from 'react'
-import { loadRepo, parseRepoUrl } from '../utils/github.js'
+import { submitRepo, pollStatus, fetchRepoData } from '../utils/api.js'
+import { mapBackendData } from '../utils/backendMapper.js'
+import { parseRepoUrl } from '../utils/github.js'
 import { MOCK } from '../utils/mockData.js'
 
 const QUICK = [
@@ -12,24 +14,32 @@ const QUICK = [
 
 export default function Landing({ onAnalyze }) {
   const [url,      setUrl]      = useState('')
-  const [token,    setToken]    = useState('')
-  const [showTok,  setShowTok]  = useState(false)
   const [loading,  setLoading]  = useState(false)
   const [progress, setProgress] = useState(0)
   const [step,     setStep]     = useState('')
   const [error,    setError]    = useState('')
 
   const handle = async () => {
-    const parsed = parseRepoUrl(url)
-    if (!parsed) { setError('Enter a valid GitHub URL or owner/repo'); return }
+    if (!url.trim()) { setError('Enter a valid GitHub URL'); return }
     setError(''); setLoading(true); setProgress(0)
     try {
-      const data = await loadRepo(
-        parsed.owner, parsed.repo,
-        token || undefined,
+      // 1. Submit to backend
+      setStep('Submitting repository…'); setProgress(5)
+      const { repositoryId } = await submitRepo(url.trim())
+
+      // 2. Poll until analysis completes
+      const repoStatus = await pollStatus(
+        repositoryId,
         (msg, pct) => { setStep(msg); setProgress(pct) }
       )
-      onAnalyze(data)
+
+      // 3. Fetch all analytics
+      setStep('Loading analytics…'); setProgress(95)
+      const rawData = await fetchRepoData(repositoryId)
+
+      // 4. Map to dashboard format
+      const dashboardData = mapBackendData(url.trim(), repoStatus, rawData)
+      onAnalyze(dashboardData)
     } catch (e) {
       setError(e.message)
       setLoading(false)
@@ -72,20 +82,7 @@ export default function Landing({ onAnalyze }) {
               <button onClick={handle} style={S.analyseBtn}>ANALYSE →</button>
             </div>
 
-            {/* Token toggle */}
-            <button onClick={() => setShowTok(s => !s)} style={S.tokenToggle}>
-              🔑 {showTok ? 'Hide' : 'Add'} GitHub token — removes rate limits &amp; unlocks private repos
-            </button>
-            {showTok && (
-              <input
-                value={token}
-                onChange={e => setToken(e.target.value)}
-                type="password"
-                placeholder="ghp_xxxxxxxxxxxx  (Settings → Developer Settings → Tokens)"
-                style={{ ...S.input, marginTop: 8, fontSize: 12, color: '#94a3b8' }}
-              />
-            )}
-
+            
             {error && <div style={S.error}>⚠ {error}</div>}
 
             {/* Quick picks */}

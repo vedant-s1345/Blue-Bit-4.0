@@ -8,7 +8,7 @@ const COLORS = {
 }
 
 export default function AIInsights({ data }) {
-  const { contributors, busFactorPct, totalCommits, fileList, collabEdges, commits } = data
+  const { contributors, busFactorPct, totalCommits, fileList, collabEdges, commits, aiInsights } = data
   const [open, setOpen] = useState(null)
 
   const top      = contributors[0]
@@ -59,7 +59,15 @@ export default function AIInsights({ data }) {
       desc: `GitLens successfully analysed ${totalCommits} commits across ${contributors.length} contributors spanning ${span}. File hotspot data was sampled from the most recent commits using the GitHub API.`,
       metric: `${totalCommits} commits · ${contributors.length} authors · ${span}`,
     },
-  ].filter(Boolean)
+    aiInsights && {
+        type: 'info',
+        icon: '🤖',
+        title: 'AI Analysis (Gemini)',
+        desc: [aiInsights.summary, aiInsights.technicalDebt, aiInsights.busFactorWarning, aiInsights.recommendations]
+              .filter(Boolean).join(' '),
+        metric: 'Powered by Google Gemini',
+      },
+    ].filter(Boolean)
 
   return (
     <div>
