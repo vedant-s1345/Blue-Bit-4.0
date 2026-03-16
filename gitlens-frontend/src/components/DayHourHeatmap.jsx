@@ -1,3 +1,4 @@
+// This component renders a heatmap visualization of commit frequency by day of week and hour of day. It takes a 2D array of commit counts (hourDay) as input, where hourDay[day][hour] gives the number of commits for that day and hour. The heatmap uses a color gradient to represent commit frequency, with tooltips on hover showing the exact count for each cell. Below the heatmap, it also displays summary cards for each day of the week, showing total commits and peak hour. The component is designed to be visually appealing and informative, providing insights into when commits are most frequent in the repository's history.
 import { useState } from 'react'
 import { lerp } from '../utils/constants.js'
 
