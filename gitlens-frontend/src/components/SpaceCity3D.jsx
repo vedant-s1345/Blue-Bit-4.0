@@ -5,6 +5,7 @@
  * - Hero rocket cruising through the scene with engine trail
  * - Star Wars pastel neon palette
  */
+//This is our innovative feature of our GitLens frontend, a 3D space city background that adds a visually stunning and immersive experience for users. This dynamic backdrop features a bustling space metropolis with futuristic skyscrapers, flying vehicles, and vibrant neon lights. The cityscape is rendered in rich detail, creating a sense of depth and scale that captivates users as they navigate through the GitLens interface. This unique visual element not only enhances the aesthetic appeal of the application but also reinforces GitLens' commitment to innovation and user engagement, making it a standout feature in the world of code visualization tools
 
 import { useEffect, useRef } from 'react'
 import * as THREE from 'three'
