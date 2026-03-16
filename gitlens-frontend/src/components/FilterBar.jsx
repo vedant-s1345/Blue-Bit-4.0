@@ -1,123 +1,108 @@
-import { useState } from "react"
+import { useState } from 'react'
+
+const FILE_TYPES = ['all', '.js', '.ts', '.jsx', '.tsx', '.py', '.java', '.go', '.md', '.css', '.html']
 
 export default function FilterBar({ filters, setFilters, authors }) {
-
-  const [search, setSearch] = useState(filters.keyword)
+  const [search, setSearch] = useState(filters.keyword || '')
 
   const updateKeyword = (value) => {
     setSearch(value)
+    setFilters(prev => ({ ...prev, keyword: value }))
+  }
 
-    setFilters(prev => ({
-      ...prev,
-      keyword: value
-    }))
+  const sel = {
+    fontSize: 12, padding: '8px 10px', borderRadius: 8,
+    background: '#020617', border: '1px solid #334155', color: '#cbd5f5',
   }
 
   return (
-    <div style={styles.container}>
+    <div style={{
+      display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 20,
+      padding: 14, borderRadius: 14,
+      background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)',
+    }}>
 
-      {/* Author Filter */}
+      {/* Author */}
       <select
         value={filters.author}
-        onChange={(e) =>
-          setFilters(prev => ({
-            ...prev,
-            author: e.target.value
-          }))
-        }
-        style={styles.select}
+        onChange={e => setFilters(prev => ({ ...prev, author: e.target.value }))}
+        style={sel}
       >
         <option value="all">All Authors</option>
-
-        {authors.map(a => (
-          <option key={a} value={a}>
-            {a}
-          </option>
-        ))}
-
+        {authors.map(a => <option key={a} value={a}>{a}</option>)}
       </select>
 
-      {/* Commit Search */}
+      {/* Keyword */}
       <input
         type="text"
-        placeholder="Search commit message..."
+        placeholder="Search commit message…"
         value={search}
-        onChange={(e) => updateKeyword(e.target.value)}
-        style={styles.input}
+        onChange={e => updateKeyword(e.target.value)}
+        style={{ ...sel, width: 200 }}
       />
 
-      {/* Time Filter */}
+      {/* File type */}
       <select
-        value={filters.timeRange}
-        onChange={(e) =>
-          setFilters(prev => ({
-            ...prev,
-            timeRange: e.target.value
-          }))
-        }
-        style={styles.select}
+        value={filters.fileType || 'all'}
+        onChange={e => setFilters(prev => ({ ...prev, fileType: e.target.value }))}
+        style={sel}
+        title="Filter heatmap by file extension"
       >
-        <option value="all">All Time</option>
-        <option value="6months">Last 6 Months</option>
+        {FILE_TYPES.map(t => (
+          <option key={t} value={t}>{t === 'all' ? 'All file types' : t}</option>
+        ))}
       </select>
 
-      {/* Clear Filters */}
+      {/* Time range */}
+      <select
+        value={filters.timeRange}
+        onChange={e => setFilters(prev => ({ ...prev, timeRange: e.target.value }))}
+        style={sel}
+      >
+        <option value="all">All Time</option>
+        <option value="1month">Last Month</option>
+        <option value="3months">Last 3 Months</option>
+        <option value="6months">Last 6 Months</option>
+        <option value="1year">Last Year</option>
+      </select>
+
+      {/* Jump to commit SHA */}
+      <input
+        type="text"
+        placeholder="Jump to SHA / date…"
+        value={filters.jumpQuery || ''}
+        onChange={e => setFilters(prev => ({ ...prev, jumpQuery: e.target.value }))}
+        style={{ ...sel, width: 160 }}
+        title="Type a SHA prefix or date (YYYY-MM-DD) to jump to that commit"
+      />
+
+      {/* Speed control */}
+      <select
+        value={filters.speed || '1'}
+        onChange={e => setFilters(prev => ({ ...prev, speed: e.target.value }))}
+        style={sel}
+        title="Playback speed"
+      >
+        <option value="0.5">Speed 0.5×</option>
+        <option value="1">Speed 1×</option>
+        <option value="2">Speed 2×</option>
+        <option value="4">Speed 4×</option>
+      </select>
+
+      {/* Clear */}
       <button
-        onClick={() =>
-          setFilters({
-            author: "all",
-            keyword: "",
-            timeRange: "all"
-          })
-        }
-        style={styles.clear}
+        onClick={() => {
+          setSearch('')
+          setFilters({ author: 'all', keyword: '', fileType: 'all', timeRange: 'all', jumpQuery: '', speed: '1' })
+        }}
+        style={{
+          fontSize: 11, padding: '8px 12px', borderRadius: 8,
+          border: '1px solid #ef4444', background: 'transparent',
+          color: '#ef4444', cursor: 'pointer',
+        }}
       >
         Clear
       </button>
-
     </div>
   )
-}
-
-const styles = {
-
-  container: {
-    display: "flex",
-    gap: 12,
-    flexWrap: "wrap",
-    marginBottom: 20,
-    padding: 14,
-    borderRadius: 14,
-    background: "rgba(255,255,255,0.03)",
-    border: "1px solid rgba(255,255,255,0.07)"
-  },
-
-  select: {
-    padding: "8px 10px",
-    borderRadius: 8,
-    background: "#020617",
-    border: "1px solid #334155",
-    color: "#cbd5f5",
-    fontSize: 12
-  },
-
-  input: {
-    padding: "8px 10px",
-    borderRadius: 8,
-    background: "#020617",
-    border: "1px solid #334155",
-    color: "#e2e8f0",
-    width: 220,
-    fontSize: 12
-  },
-
-  clear: {
-    padding: "8px 12px",
-    borderRadius: 8,
-    border: "1px solid #ef4444",
-    background: "transparent",
-    color: "#ef4444",
-    fontSize: 12,
-    cursor: "pointer"
-  }
 }

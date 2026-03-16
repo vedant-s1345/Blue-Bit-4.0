@@ -5,15 +5,16 @@ const COLORS = {
   warning:  { bg: 'rgba(249,115,22,0.07)',  border: '#f9731630', text: '#fb923c' },
   info:     { bg: 'rgba(99,102,241,0.07)',  border: '#6366f130', text: '#818cf8' },
   success:  { bg: 'rgba(34,197,94,0.07)',   border: '#22c55e30', text: '#4ade80' },
+  ai:       { bg: 'rgba(168,85,247,0.07)',  border: '#a855f730', text: '#c084fc' },
 }
 
 export default function AIInsights({ data }) {
   const { contributors, busFactorPct, totalCommits, fileList, collabEdges, commits, aiInsights } = data
   const [open, setOpen] = useState(null)
 
-  const top      = contributors[0]
-  const topPair  = collabEdges[0]
-  const hotFile  = fileList[0]
+  const top     = contributors[0]
+  const topPair = collabEdges[0]
+  const hotFile = fileList[0]
 
   let span = '—'
   if (commits.length > 1) {
@@ -28,61 +29,65 @@ export default function AIInsights({ data }) {
       type: busFactorPct > 65 ? 'critical' : 'warning',
       icon: '⚠️',
       title: `Bus Factor Risk: ${busFactorPct}%`,
-      desc: `${top.login} authored ${busFactorPct}% of all ${totalCommits} commits. If they become unavailable the project faces serious continuity risk. Distribute ownership across at least 3 active contributors and add thorough documentation.`,
+      desc: `@${top.login} authored ${busFactorPct}% of all ${totalCommits} commits. If they become unavailable the project faces serious continuity risk. Distribute ownership across at least 3 active contributors and add thorough documentation.`,
       metric: `${top.commits} / ${totalCommits} commits`,
     },
     hotFile && {
       type: hotFile.risk === 'critical' ? 'critical' : 'warning',
       icon: '🔥',
       title: `Hotspot: ${hotFile.file.split('/').pop()}`,
-      desc: `"${hotFile.file}" was modified ${hotFile.changes}× in the sampled window — the highest churn in the repository. High churn signals unstable requirements, missing abstraction layers, or technical debt accumulation.`,
+      desc: `"${hotFile.file}" was modified ${hotFile.changes}× — highest churn in the repository. High churn signals unstable requirements, missing abstraction layers, or technical debt.`,
       metric: `${hotFile.changes} edits · +${hotFile.additions} −${hotFile.deletions}`,
     },
     topPair && {
       type: 'info',
       icon: '🌐',
       title: `Top Pair: ${topPair.from} ↔ ${topPair.to}`,
-      desc: `These developers share the strongest collaboration signal (${topPair.strength} proximity events). They likely co-own a core feature area and are ideal candidates for cross-reviews and pair programming sessions.`,
+      desc: `These developers share the strongest collaboration signal (${topPair.strength} proximity events). Ideal candidates for cross-reviews and pair-programming.`,
       metric: `${topPair.strength} proximity events`,
     },
     contributors.length < 3 && {
       type: 'warning',
       icon: '👥',
       title: 'Small Contributor Base',
-      desc: `Only ${contributors.length} unique contributor${contributors.length !== 1 ? 's' : ''} found. Projects with fewer than 3 active contributors carry high concentration risk. Actively onboard more contributors and document tribal knowledge.`,
+      desc: `Only ${contributors.length} unique contributor${contributors.length !== 1 ? 's' : ''} found. Projects with fewer than 3 active contributors carry high concentration risk.`,
       metric: `${contributors.length} contributor${contributors.length !== 1 ? 's' : ''}`,
     },
     {
       type: 'success',
       icon: '📡',
       title: 'Repository Scan Complete',
-      desc: `GitLens successfully analysed ${totalCommits} commits across ${contributors.length} contributors spanning ${span}. File hotspot data was sampled from the most recent commits using the GitHub API.`,
+      desc: `GitLens analysed ${totalCommits} commits across ${contributors.length} contributors spanning ${span}. Use the ✦ AI Chat button (bottom-right) for interactive analysis and deeper questions.`,
       metric: `${totalCommits} commits · ${contributors.length} authors · ${span}`,
     },
     aiInsights && {
-        type: 'info',
-        icon: '🤖',
-        title: 'AI Analysis (Gemini)',
-        desc: [aiInsights.summary, aiInsights.technicalDebt, aiInsights.busFactorWarning, aiInsights.recommendations]
-              .filter(Boolean).join(' '),
-        metric: 'Powered by Google Gemini',
-      },
-    ].filter(Boolean)
+      type: 'ai',
+      icon: '🤖',
+      title: 'AI Analysis (Backend)',
+      desc: [aiInsights.summary, aiInsights.technicalDebt, aiInsights.busFactorWarning, aiInsights.recommendations].filter(Boolean).join('\n\n'),
+      metric: 'Powered by Gemini via backend',
+    },
+  ].filter(Boolean)
 
   return (
     <div>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 20 }}>
+      {/* Status */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 18 }}>
         <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#4ade80', boxShadow: '0 0 8px #4ade80', animation: 'pulse 1.5s infinite' }}/>
         <span style={{ color: '#475569', fontSize: 12, fontFamily: "'JetBrains Mono',monospace" }}>
-          Analysis derived from real commit data · click cards to expand
+          Derived from real commit data · click cards to expand
         </span>
+        <div style={{ flex: 1 }} />
+        <div style={{ fontSize: 11, color: '#64748b', fontFamily: "'JetBrains Mono',monospace", padding: '5px 12px', borderRadius: 8, background: 'rgba(168,85,247,0.08)', border: '1px solid rgba(168,85,247,0.2)' }}>
+          ✦ More analysis → AI Chat (bottom right)
+        </div>
       </div>
 
+      {/* Cards */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
         {insights.map((ins, i) => {
-          const c = COLORS[ins.type]
+          const c = COLORS[ins.type] || COLORS.info
           const isOpen = open === i
-
           return (
             <div
               key={i}
@@ -102,7 +107,7 @@ export default function AIInsights({ data }) {
                 <div style={{ color: '#334155', transform: isOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }}>▾</div>
               </div>
               {isOpen && (
-                <div style={{ marginTop: 10, borderTop: `1px solid ${c.border}`, paddingTop: 10, color: '#94a3b8', fontSize: 13, lineHeight: 1.75 }}>
+                <div style={{ marginTop: 10, borderTop: `1px solid ${c.border}`, paddingTop: 10, color: '#94a3b8', fontSize: 13, lineHeight: 1.75, whiteSpace: 'pre-wrap' }}>
                   {ins.desc}
                 </div>
               )}

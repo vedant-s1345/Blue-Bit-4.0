@@ -1,6 +1,7 @@
 package com.gitlens.backend.controller;
 
 import com.gitlens.backend.dto.*;
+import com.gitlens.backend.dto.ChatRequest;
 import com.gitlens.backend.gitparser.GitParserService;
 import com.gitlens.backend.model.Repository;
 import com.gitlens.backend.repository.RepositoryRepo;
@@ -148,6 +149,24 @@ public class GitLensController {
         }
     }
     
+    // POST /api/chat — multi-turn AI chat proxy (used by frontend RepoBot)
+    @PostMapping("/chat")
+    public ResponseEntity<?> chat(@RequestBody ChatRequest request) {
+        try {
+            if (request.getMessages() == null || request.getMessages().isEmpty()) {
+                return ResponseEntity.badRequest().body(Map.of("error", "messages array is required"));
+            }
+            String reply = aiInsightService.chat(
+                request.getSystemPrompt() != null ? request.getSystemPrompt() : "",
+                request.getMessages()
+            );
+            return ResponseEntity.ok(Map.of("reply", reply));
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError()
+                    .body(Map.of("error", e.getMessage()));
+        }
+    }
+
     private boolean isValidGitUrl(String url) {
         if (url == null || url.isBlank()) return false;
 

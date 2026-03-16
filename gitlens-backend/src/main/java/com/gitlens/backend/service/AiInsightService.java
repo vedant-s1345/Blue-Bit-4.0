@@ -1,6 +1,7 @@
 package com.gitlens.backend.service;
 
 import com.gitlens.backend.dto.AiInsightDTO;
+import com.gitlens.backend.dto.ChatRequest;
 import com.gitlens.backend.dto.ContributorDTO;
 import com.gitlens.backend.dto.HeatmapDTO;
 import com.gitlens.backend.model.Commit;
@@ -145,9 +146,81 @@ public class AiInsightService {
                 """;
     }
 
+    // ── Multi-turn chat used by the frontend bot ──────────────────────────────
+    public String chat(String systemPrompt, java.util.List<ChatRequest.Message> messages) throws Exception {
+        if (geminiApiKey == null || geminiApiKey.isBlank() || geminiApiKey.equals("YOUR_KEY_HERE")) {
+            return "AI chat is not configured — add your Gemini API key to application.properties (gemini.api.key).";
+        }
+
+        // Gemini multi-turn format: inject system prompt as first user turn
+        com.google.gson.JsonArray contents = new com.google.gson.JsonArray();
+
+        // System prompt as first user message + empty model ack (Gemini has no system role)
+        com.google.gson.JsonObject sysUser = new com.google.gson.JsonObject();
+        sysUser.addProperty("role", "user");
+        com.google.gson.JsonArray sysParts = new com.google.gson.JsonArray();
+        com.google.gson.JsonObject sysText = new com.google.gson.JsonObject();
+        sysText.addProperty("text", systemPrompt);
+        sysParts.add(sysText);
+        sysUser.add("parts", sysParts);
+        contents.add(sysUser);
+
+        com.google.gson.JsonObject sysAck = new com.google.gson.JsonObject();
+        sysAck.addProperty("role", "model");
+        com.google.gson.JsonArray ackParts = new com.google.gson.JsonArray();
+        com.google.gson.JsonObject ackText = new com.google.gson.JsonObject();
+        ackText.addProperty("text", "Understood. I have full context of this repository and am ready to answer questions.");
+        ackParts.add(ackText);
+        sysAck.add("parts", ackParts);
+        contents.add(sysAck);
+
+        // Actual conversation history
+        for (ChatRequest.Message msg : messages) {
+            com.google.gson.JsonObject turn = new com.google.gson.JsonObject();
+            // Gemini uses "model" not "assistant"
+            turn.addProperty("role", "assistant".equals(msg.getRole()) ? "model" : "user");
+            com.google.gson.JsonArray parts = new com.google.gson.JsonArray();
+            com.google.gson.JsonObject text = new com.google.gson.JsonObject();
+            text.addProperty("text", msg.getContent());
+            parts.add(text);
+            turn.add("parts", parts);
+            contents.add(turn);
+        }
+
+        com.google.gson.JsonObject body = new com.google.gson.JsonObject();
+        body.add("contents", contents);
+
+        com.google.gson.JsonObject genConfig = new com.google.gson.JsonObject();
+        genConfig.addProperty("temperature", 0.7);
+        genConfig.addProperty("maxOutputTokens", 800);
+        body.add("generationConfig", genConfig);
+
+        String url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=" + geminiApiKey;
+
+        HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create(url))
+                .header("Content-Type", "application/json")
+                .POST(HttpRequest.BodyPublishers.ofString(body.toString()))
+                .build();
+
+        HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+
+        if (response.statusCode() != 200) {
+            throw new RuntimeException("Gemini error " + response.statusCode() + ": " + response.body());
+        }
+
+        com.google.gson.JsonObject json = com.google.gson.JsonParser.parseString(response.body()).getAsJsonObject();
+        return json.getAsJsonArray("candidates")
+                .get(0).getAsJsonObject()
+                .getAsJsonObject("content")
+                .getAsJsonArray("parts")
+                .get(0).getAsJsonObject()
+                .get("text").getAsString();
+    }
+
     private String callGemini(String prompt) throws Exception {
         String url = "https://generativelanguage.googleapis.com/v1beta/models/" +
-        		"gemini-2.0-flash-lite:generateContent?key=" + geminiApiKey;
+        		"gemini-1.5-flash:generateContent?key=" + geminiApiKey;
 
         String requestBody = """
                 {
