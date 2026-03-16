@@ -1,3 +1,4 @@
+// This component renders a modal dialog that shows detailed information about a specific commit, including its message, author, date, stats, and file diffs. It fetches the full commit data from the GitHub API when opened, and handles various error states like rate limiting or bad tokens. The modal can be closed by clicking outside or pressing Escape, and includes links to view the commit on GitHub.
 import { useState, useEffect } from 'react'
 import { fmtDate } from '../utils/constants.js'
 
