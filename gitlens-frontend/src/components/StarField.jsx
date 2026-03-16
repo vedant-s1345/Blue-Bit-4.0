@@ -1,3 +1,4 @@
+// This component creates a star field background using the HTML5 canvas API. It generates a number of stars with random positions, sizes, and opacities, and animates them to create a twinkling effect. The canvas is resized to fill the entire window, and the animation is cleaned up when the component is unmounted
 import { useEffect, useRef } from 'react'
 
 export default function StarField() {
