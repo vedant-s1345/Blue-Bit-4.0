@@ -102,29 +102,38 @@ export async function loadRepo(owner, repo, token, onProgress) {
 
   onProgress('Sampling file diffs…', 60)
   const fChurn       = {}
-  const fileActivity = {}   // filename -> [{date, additions, deletions}]
+  const fileActivity = {}
 
-  for (let i = 0; i < Math.min(60, commits.length); i += 8) {
-    try {
-      const det        = await ghFetch(`${GH}/repos/${owner}/${repo}/commits/${commits[i].sha}`, token)
-      const sampleDate = commits[i].commit?.author?.date || null
+  // Sample every 5th commit up to 100 — uses ~20 API calls max, preserving
+  // rate limit budget so CommitModal diff fetches still work (60 req/hr unauth)
+  const sampleIndices = []
+  for (let i = 0; i < Math.min(100, commits.length); i += 5) sampleIndices.push(i)
 
-      ;(det.files || []).forEach(f => {
-        if (!fChurn[f.filename]) {
-          fChurn[f.filename] = { file: f.filename, changes: 0, additions: 0, deletions: 0 }
-        }
-        fChurn[f.filename].changes++
-        fChurn[f.filename].additions += f.additions || 0
-        fChurn[f.filename].deletions += f.deletions || 0
-
-        if (sampleDate) {
-          if (!fileActivity[f.filename]) fileActivity[f.filename] = []
-          fileActivity[f.filename].push({
-            date: sampleDate, additions: f.additions || 0, deletions: f.deletions || 0,
+  const BATCH = 3
+  for (let b = 0; b < sampleIndices.length; b += BATCH) {
+    const batch = sampleIndices.slice(b, b + BATCH)
+    await Promise.allSettled(
+      batch.map(async (i) => {
+        try {
+          const det        = await ghFetch(`${GH}/repos/${owner}/${repo}/commits/${commits[i].sha}`, token)
+          const sampleDate = commits[i].commit?.author?.date || null
+          ;(det.files || []).forEach(f => {
+            if (!fChurn[f.filename]) {
+              fChurn[f.filename] = { file: f.filename, changes: 0, additions: 0, deletions: 0 }
+            }
+            fChurn[f.filename].changes++
+            fChurn[f.filename].additions += f.additions || 0
+            fChurn[f.filename].deletions += f.deletions || 0
+            if (sampleDate) {
+              if (!fileActivity[f.filename]) fileActivity[f.filename] = []
+              fileActivity[f.filename].push({
+                date: sampleDate, additions: f.additions || 0, deletions: f.deletions || 0,
+              })
+            }
           })
-        }
+        } catch (_) {}
       })
-    } catch (_) {}
+    )
   }
 
   onProgress('Fetching branches…', 84)
@@ -138,7 +147,7 @@ export async function loadRepo(owner, repo, token, onProgress) {
   const maxCh    = Math.max(...Object.values(fChurn).map(x => x.changes), 1)
   const fileList = Object.values(fChurn)
     .sort((a, b) => b.changes - a.changes)
-    .slice(0, 14)
+    .slice(0, 50)
     .map(f => ({
       ...f,
       churn: Math.min(100, Math.round((f.changes / maxCh) * 100)),

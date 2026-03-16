@@ -81,9 +81,11 @@ export function mapBackendData(repoUrl, repoStatus, { timeline, heatmap, contrib
     contributors: mappedContributors,
     hourDay,
     fileList:     mappedFiles,
+    fileActivity: {},
+    branches:     [],        // BranchViz will self-fetch from GitHub
     collabEdges,
     totalCommits,
     busFactorPct,
-    aiInsights:   insights,  // backend AI insights passed through
+    aiInsights:   insights,
   }
 }

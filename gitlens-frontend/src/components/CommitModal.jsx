@@ -3,23 +3,24 @@ import { fmtDate } from '../utils/constants.js'
 
 const GH = 'https://api.github.com'
 
-// Fetch diff from GitHub — needs full 40-char SHA and valid token
 async function fetchDiff(owner, repo, sha, token) {
-  if (!sha || sha.length < 7) throw new Error('No valid SHA')
+  if (!sha || sha.length < 4) throw new Error('no-sha')
   const headers = {
     Accept: 'application/vnd.github+json',
     ...(token ? { Authorization: `Bearer ${token}` } : {}),
   }
   const res = await fetch(`${GH}/repos/${owner}/${repo}/commits/${sha}`, { headers })
-  if (res.status === 404) throw new Error('404')
-  if (res.status === 403) throw new Error('rate-limited')
-  if (!res.ok)            throw new Error(`GitHub ${res.status}`)
+  if (res.status === 403 || res.status === 429) throw new Error('rate-limited')
+  if (res.status === 401)  throw new Error('bad-token')
+  if (res.status === 404)  throw new Error('not-found')
+  if (!res.ok)             throw new Error(`github-${res.status}`)
   return res.json()
 }
 
 export default function CommitModal({ commit, owner, repo, token, onClose }) {
-  const [diff,     setDiff]    = useState(null)
-  const [diffState, setDiffState] = useState('loading') // loading | ok | unavailable
+  const [diff,      setDiff]      = useState(null)
+  const [diffState, setDiffState] = useState('loading') // loading | ok | rate-limited | bad-token | not-found | error
+  const [errCode,   setErrCode]   = useState('')
 
   const sha     = commit?.sha || ''
   const message = commit?.commit?.message || ''
@@ -34,7 +35,7 @@ export default function CommitModal({ commit, owner, repo, token, onClose }) {
     setDiffState('loading')
     fetchDiff(owner, repo, sha, token)
       .then(d  => { setDiff(d); setDiffState('ok') })
-      .catch(() => setDiffState('unavailable'))
+      .catch(e => { setErrCode(e.message); setDiffState(e.message === 'rate-limited' ? 'rate-limited' : e.message === 'bad-token' ? 'bad-token' : 'unavailable') })
   }, [sha, owner, repo, token])
 
   useEffect(() => {
@@ -49,22 +50,13 @@ export default function CommitModal({ commit, owner, repo, token, onClose }) {
   return (
     <div
       onClick={onClose}
-      style={{
-        position: 'fixed', inset: 0, zIndex: 999,
-        background: 'rgba(2,6,23,0.85)', backdropFilter: 'blur(4px)',
-        display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24,
-      }}
+      style={{ position: 'fixed', inset: 0, zIndex: 999, background: 'rgba(2,6,23,0.85)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}
     >
       <div
         onClick={e => e.stopPropagation()}
-        style={{
-          width: '100%', maxWidth: 740, maxHeight: '84vh',
-          background: '#0f172a', border: '1px solid rgba(99,102,241,0.3)',
-          borderRadius: 20, display: 'flex', flexDirection: 'column',
-          boxShadow: '0 24px 80px rgba(0,0,0,0.8)',
-        }}
+        style={{ width: '100%', maxWidth: 740, maxHeight: '84vh', background: '#0f172a', border: '1px solid rgba(99,102,241,0.3)', borderRadius: 20, display: 'flex', flexDirection: 'column', boxShadow: '0 24px 80px rgba(0,0,0,0.8)' }}
       >
-        {/* ── Header ── */}
+        {/* Header */}
         <div style={{ padding: '18px 20px', borderBottom: '1px solid rgba(255,255,255,0.06)', display: 'flex', alignItems: 'flex-start', gap: 12 }}>
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ color: '#a5b4fc', fontFamily: "'JetBrains Mono',monospace", fontSize: 11, marginBottom: 6 }}>
@@ -75,17 +67,15 @@ export default function CommitModal({ commit, owner, repo, token, onClose }) {
             </div>
           </div>
           <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
-            <a
-              href={ghUrl} target="_blank" rel="noopener noreferrer"
-              style={{ fontSize: 11, padding: '6px 14px', borderRadius: 8, background: 'rgba(99,102,241,0.18)', border: '1px solid rgba(99,102,241,0.4)', color: '#a5b4fc', textDecoration: 'none', fontFamily: "'JetBrains Mono',monospace" }}
-            >
+            <a href={ghUrl} target="_blank" rel="noopener noreferrer"
+              style={{ fontSize: 11, padding: '6px 14px', borderRadius: 8, background: 'rgba(99,102,241,0.18)', border: '1px solid rgba(99,102,241,0.4)', color: '#a5b4fc', textDecoration: 'none', fontFamily: "'JetBrains Mono',monospace" }}>
               View on GitHub ↗
             </a>
-            <button onClick={onClose} style={{ width: 30, height: 30, borderRadius: '50%', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', color: '#64748b', fontSize: 14 }}>✕</button>
+            <button onClick={onClose} style={{ width: 30, height: 30, borderRadius: '50%', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', color: '#64748b', fontSize: 14, cursor: 'pointer' }}>✕</button>
           </div>
         </div>
 
-        {/* ── Stats bar — always shown from commit data we already have ── */}
+        {/* Stats — always shown from data we already have */}
         <div style={{ padding: '10px 20px', borderBottom: '1px solid rgba(255,255,255,0.04)', display: 'flex', gap: 24, flexWrap: 'wrap' }}>
           {diffState === 'ok' ? (
             <>
@@ -99,46 +89,60 @@ export default function CommitModal({ commit, owner, repo, token, onClose }) {
               {deleted !== null && <Stat label="Lines removed" val={`-${deleted}`} color="#f87171" />}
             </>
           )}
-          <Stat label="SHA" val={sha.slice(0, 7)} />
+          <Stat label="SHA"    val={sha.slice(0, 7)} />
           <Stat label="Author" val={author} />
         </div>
 
-        {/* ── Body ── */}
+        {/* Body */}
         <div style={{ flex: 1, overflowY: 'auto', padding: '14px 20px' }}>
 
-          {/* Loading */}
           {diffState === 'loading' && (
             <div style={{ color: '#475569', fontFamily: "'JetBrains Mono',monospace", fontSize: 12, padding: '24px 0', textAlign: 'center' }}>
-              Fetching diff from GitHub…
+              Fetching diff…
             </div>
           )}
 
-          {/* Graceful degradation — no diff available */}
+          {/* Rate limited */}
+          {diffState === 'rate-limited' && (
+            <InfoBox color="#f59e0b" icon="⚡">
+              <strong style={{ color: '#fbbf24' }}>GitHub API rate limit reached</strong>
+              <p style={{ margin: '6px 0 0', color: '#94a3b8', fontSize: 12, lineHeight: 1.6 }}>
+                You've hit GitHub's 60 requests/hour unauthenticated limit (used during repo loading).
+                Add a GitHub token on the landing page to raise the limit to 5,000/hour — then re-analyze the repo.
+              </p>
+              <a href={ghUrl} target="_blank" rel="noopener noreferrer" style={linkBtn}>Open on GitHub ↗</a>
+            </InfoBox>
+          )}
+
+          {/* Bad token */}
+          {diffState === 'bad-token' && (
+            <InfoBox color="#f87171" icon="🔑">
+              <strong style={{ color: '#f87171' }}>Token rejected</strong>
+              <p style={{ margin: '6px 0 0', color: '#94a3b8', fontSize: 12, lineHeight: 1.6 }}>
+                Your GitHub token doesn't have access to this repo. Make sure it has <code style={{ color: '#a5b4fc' }}>public_repo</code> scope.
+              </p>
+              <a href={ghUrl} target="_blank" rel="noopener noreferrer" style={linkBtn}>Open on GitHub ↗</a>
+            </InfoBox>
+          )}
+
+          {/* Generic unavailable */}
           {diffState === 'unavailable' && (
-            <div style={{ padding: '14px 0' }}>
-              <div style={{ padding: '12px 16px', borderRadius: 10, background: 'rgba(99,102,241,0.07)', border: '1px solid rgba(99,102,241,0.2)', marginBottom: 14 }}>
-                <div style={{ color: '#818cf8', fontSize: 12, fontFamily: "'JetBrains Mono',monospace", marginBottom: 6 }}>
-                  ℹ Diff not available — GitHub API requires a valid token for this repo
-                </div>
-                <div style={{ color: '#475569', fontSize: 11, fontFamily: "'JetBrains Mono',monospace" }}>
-                  Add a GitHub token in the URL input (format: <code style={{ color: '#a5b4fc' }}>owner/repo?token=ghp_…</code>) or view the full diff on GitHub:
-                </div>
+            <InfoBox color="#818cf8" icon="ℹ">
+              <strong style={{ color: '#a5b4fc' }}>Diff not available</strong>
+              <p style={{ margin: '6px 0 0', color: '#94a3b8', fontSize: 12, lineHeight: 1.6 }}>
+                Could not load the diff for this commit. This can happen with very large commits or binary files.
+              </p>
+              <a href={ghUrl} target="_blank" rel="noopener noreferrer" style={linkBtn}>Open on GitHub ↗</a>
+            </InfoBox>
+          )}
+
+          {/* Full commit message body */}
+          {diffState !== 'ok' && message.includes('\n') && (
+            <div style={{ marginTop: 16 }}>
+              <div style={{ color: '#334155', fontSize: 10, fontFamily: "'JetBrains Mono',monospace", marginBottom: 6, letterSpacing: '0.1em' }}>COMMIT BODY</div>
+              <div style={{ color: '#94a3b8', fontSize: 13, lineHeight: 1.7, whiteSpace: 'pre-wrap', padding: '10px 14px', borderRadius: 8, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)' }}>
+                {message.split('\n').slice(1).join('\n').trim()}
               </div>
-              <a
-                href={ghUrl} target="_blank" rel="noopener noreferrer"
-                style={{ display: 'inline-flex', alignItems: 'center', gap: 8, fontSize: 13, padding: '10px 18px', borderRadius: 10, background: 'rgba(99,102,241,0.15)', border: '1px solid rgba(99,102,241,0.35)', color: '#a5b4fc', textDecoration: 'none', fontFamily: "'JetBrains Mono',monospace" }}
-              >
-                Open commit on GitHub ↗
-              </a>
-              {/* Show the full commit message body if multi-line */}
-              {message.includes('\n') && (
-                <div style={{ marginTop: 20 }}>
-                  <div style={{ color: '#334155', fontSize: 10, fontFamily: "'JetBrains Mono',monospace", marginBottom: 8, letterSpacing: '0.1em' }}>COMMIT BODY</div>
-                  <div style={{ color: '#94a3b8', fontSize: 13, lineHeight: 1.7, whiteSpace: 'pre-wrap', padding: '10px 14px', borderRadius: 8, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)' }}>
-                    {message.split('\n').slice(1).join('\n').trim()}
-                  </div>
-                </div>
-              )}
             </div>
           )}
 
@@ -146,7 +150,7 @@ export default function CommitModal({ commit, owner, repo, token, onClose }) {
           {diffState === 'ok' && files.map((f, i) => <FileRow key={i} file={f} owner={owner} repo={repo} sha={sha} />)}
         </div>
 
-        {/* ── Parents footer ── */}
+        {/* Parents */}
         {diffState === 'ok' && diff?.parents?.length > 0 && (
           <div style={{ padding: '10px 20px', borderTop: '1px solid rgba(255,255,255,0.04)', display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
             <span style={{ color: '#334155', fontSize: 10, fontFamily: "'JetBrains Mono',monospace" }}>PARENTS:</span>
@@ -161,6 +165,23 @@ export default function CommitModal({ commit, owner, repo, token, onClose }) {
       </div>
     </div>
   )
+}
+
+function InfoBox({ color, icon, children }) {
+  return (
+    <div style={{ padding: '14px 16px', borderRadius: 10, background: color + '10', border: `1px solid ${color}30`, marginBottom: 8 }}>
+      <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
+        <span style={{ fontSize: 16, flexShrink: 0 }}>{icon}</span>
+        <div style={{ flex: 1 }}>{children}</div>
+      </div>
+    </div>
+  )
+}
+
+const linkBtn = {
+  display: 'inline-block', marginTop: 10, fontSize: 12, padding: '7px 16px',
+  borderRadius: 8, background: 'rgba(99,102,241,0.15)', border: '1px solid rgba(99,102,241,0.35)',
+  color: '#a5b4fc', textDecoration: 'none', fontFamily: "'JetBrains Mono',monospace",
 }
 
 function Stat({ label, val, color }) {
@@ -180,10 +201,8 @@ function FileRow({ file, owner, repo, sha }) {
 
   return (
     <div style={{ marginBottom: 6, borderRadius: 8, border: '1px solid rgba(255,255,255,0.05)', overflow: 'hidden' }}>
-      <div
-        onClick={() => setOpen(o => !o)}
-        style={{ padding: '8px 12px', display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', background: 'rgba(255,255,255,0.02)' }}
-      >
+      <div onClick={() => setOpen(o => !o)}
+        style={{ padding: '8px 12px', display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', background: 'rgba(255,255,255,0.02)' }}>
         <span style={{ fontSize: 9, padding: '2px 6px', borderRadius: 4, background: statusColor + '22', color: statusColor, fontFamily: "'JetBrains Mono',monospace", textTransform: 'uppercase', flexShrink: 0 }}>
           {file.status}
         </span>
@@ -197,7 +216,6 @@ function FileRow({ file, owner, repo, sha }) {
         <span style={{ color: '#f87171', fontSize: 10, fontFamily: "'JetBrains Mono',monospace", flexShrink: 0 }}>-{file.deletions}</span>
         <span style={{ color: '#334155', fontSize: 11 }}>{open ? '▴' : '▾'}</span>
       </div>
-
       {open && (
         <div style={{ padding: '8px 12px', background: 'rgba(0,0,0,0.3)', overflowX: 'auto' }}>
           {file.patch ? (
@@ -205,21 +223,17 @@ function FileRow({ file, owner, repo, sha }) {
               {file.patch.split('\n').slice(0, 80).map((line, i) => {
                 const bg  = line.startsWith('+') ? 'rgba(74,222,128,0.1)' : line.startsWith('-') ? 'rgba(248,113,113,0.1)' : line.startsWith('@') ? 'rgba(99,102,241,0.1)' : 'transparent'
                 const col = line.startsWith('+') ? '#86efac' : line.startsWith('-') ? '#fca5a5' : line.startsWith('@') ? '#a5b4fc' : '#475569'
-                return (
-                  <div key={i} style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 10, lineHeight: 1.7, background: bg, color: col, paddingLeft: 4, whiteSpace: 'pre' }}>
-                    {line}
-                  </div>
-                )
+                return <div key={i} style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 10, lineHeight: 1.7, background: bg, color: col, paddingLeft: 4, whiteSpace: 'pre' }}>{line}</div>
               })}
               {file.patch.split('\n').length > 80 && (
                 <div style={{ color: '#334155', fontSize: 10, fontFamily: "'JetBrains Mono',monospace", paddingTop: 4 }}>
                   … {file.patch.split('\n').length - 80} more lines —{' '}
-                  <a href={`https://github.com/${owner}/${repo}/commit/${sha}#diff-${btoa(file.filename).replace(/=/g,'')}`} target="_blank" rel="noopener noreferrer" style={{ color: '#6366f1' }}>full diff on GitHub</a>
+                  <a href={`https://github.com/${owner}/${repo}/commit/${sha}`} target="_blank" rel="noopener noreferrer" style={{ color: '#6366f1' }}>full diff on GitHub</a>
                 </div>
               )}
             </>
           ) : (
-            <div style={{ color: '#334155', fontSize: 10, fontFamily: "'JetBrains Mono',monospace" }}>No patch (binary or large file)</div>
+            <div style={{ color: '#334155', fontSize: 10, fontFamily: "'JetBrains Mono',monospace" }}>No patch (binary or too large)</div>
           )}
         </div>
       )}

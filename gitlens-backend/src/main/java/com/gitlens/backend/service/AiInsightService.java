@@ -195,7 +195,7 @@ public class AiInsightService {
         genConfig.addProperty("maxOutputTokens", 800);
         body.add("generationConfig", genConfig);
 
-        String url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=" + geminiApiKey;
+        String url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=" + geminiApiKey;
 
         HttpRequest request = HttpRequest.newBuilder()
                 .uri(URI.create(url))
@@ -220,7 +220,7 @@ public class AiInsightService {
 
     private String callGemini(String prompt) throws Exception {
         String url = "https://generativelanguage.googleapis.com/v1beta/models/" +
-        		"gemini-1.5-flash:generateContent?key=" + geminiApiKey;
+        		"gemini-2.0-flash:generateContent?key=" + geminiApiKey;
 
         String requestBody = """
                 {
