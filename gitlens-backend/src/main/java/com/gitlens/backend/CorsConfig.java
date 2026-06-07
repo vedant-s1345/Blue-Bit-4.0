@@ -15,6 +15,8 @@ public class CorsConfig {
         config.addAllowedOrigin("http://localhost:5173");
         config.addAllowedOrigin("http://localhost:3000");
         config.addAllowedOrigin("http://localhost:4173");
+        config.addAllowedOrigin("https://blue-bit-4-0-wheat.vercel.app");
+        config.addAllowedOriginPattern("https://*.vercel.app");
         config.addAllowedHeader("*");
         config.addAllowedMethod("*");
 
