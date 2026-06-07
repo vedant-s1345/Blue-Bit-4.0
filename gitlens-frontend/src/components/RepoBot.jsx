@@ -145,7 +145,7 @@ export default function RepoBot({ data }) {
     setLoading(true)
 
     try {
-      const res = await fetch('http://localhost:8082/api/chat', {
+      const res = await fetch(`${import.meta.env.VITE_API_BASE || 'http://localhost:8082/api'}/chat`, {        
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

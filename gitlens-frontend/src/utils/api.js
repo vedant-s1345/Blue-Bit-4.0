@@ -1,4 +1,4 @@
-const BASE = 'http://localhost:8082/api'
+const BASE = import.meta.env.VITE_API_BASE || 'http://localhost:8082/api'
 
 // Submit a repo for analysis, returns { repositoryId, status }
 export async function submitRepo(repoUrl) {
