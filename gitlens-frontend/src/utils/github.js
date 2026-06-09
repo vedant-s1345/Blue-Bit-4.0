@@ -156,6 +156,41 @@ export async function loadRepo(owner, repo, token, onProgress) {
 
   onProgress('Done!', 100)
 
+  // Store in backend DB (non-blocking, best-effort)
+  try {
+    const apiBase = import.meta.env.VITE_API_BASE || 'http://localhost:8082/api'
+    fetch(`${apiBase}/store`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        repoUrl: `https://github.com/${owner}/${repo}`,
+        repoName: `${owner}/${repo}`,
+        totalCommits: commits.length,
+        commits: commits.slice(0, 100).map(c => ({
+          sha: c.sha,
+          author: c.commit?.author?.name || 'unknown',
+          authorEmail: c.commit?.author?.email || '',
+          message: c.commit?.message || '',
+          date: c.commit?.author?.date || new Date().toISOString(),
+          additions: 0,
+          deletions: 0
+        })),
+        contributors: contributors.map(c => ({
+          name: c.login,
+          totalCommits: c.commits,
+          linesAdded: 0,
+          linesDeleted: 0
+        })),
+        files: fileList.map(f => ({
+          filePath: f.file,
+          churnScore: f.churn,
+          commitCount: f.changes,
+          risk: f.risk
+        }))
+      })
+    }).catch(() => {})
+  } catch (_) {}
+
   return {
     repoInfo, commits, contributors,
     hourDay, fileList, fileActivity, branches,

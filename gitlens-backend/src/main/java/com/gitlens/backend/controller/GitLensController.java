@@ -193,4 +193,14 @@ public class GitLensController {
 
         return isKnownHost;
     }
+    
+    @PostMapping("/store")
+    public ResponseEntity<?> storeRepo(@RequestBody StoreRepoRequest req) {
+        try {
+            analyticsService.storeFromFrontend(req);
+            return ResponseEntity.ok(Map.of("message", "Stored successfully"));
+        } catch (Exception e) {
+            return ResponseEntity.status(500).body(Map.of("error", e.getMessage()));
+        }
+    }
 }
