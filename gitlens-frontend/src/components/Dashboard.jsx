@@ -1,8 +1,7 @@
-// This is the main dashboard component that integrates all the features and visualizations. It manages the state for filters, playback, and the current commit index, and renders the header, filter bar, player controls, tabs, and panels. It also handles the logic for filtering commits based on user input, playing through the commit history, and opening the commit detail modal. The dashboard is designed to be responsive and visually cohesive, with a consistent style and color scheme throughout the various components and visualizations. It serves as the central hub for users to explore their repository's history and insights in an interactive and engaging way.
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { getAuthorColor, fmtDate } from '../utils/constants.js'
+import { useIsMobile } from '../utils/useIsMobile.js'
 
-// ── Imports (yours + mine, merged) ───────────────────────────────────────────
 import FilterBar          from './FilterBar'
 import HallOfFame         from './HallOfFame'
 import CommitModal        from './CommitModal'
@@ -22,30 +21,30 @@ import DayHourHeatmap  from './DayHourHeatmap.jsx'
 import Galaxy          from './Galaxy.jsx'
 import AIInsights      from './AIInsights.jsx'
 
-// ── Tab definitions (all tabs from both versions) ────────────────────────────
-const mkLabel = (Icon, cls, text) => (
-  <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-    <Icon size={18} className={cls} />{text}
+const mkLabel = (Icon, cls, text, short) => (isMob) => (
+  <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+    <Icon size={16} className={cls} />{isMob ? short : text}
   </span>
 )
 
 const TABS = [
-  { id: 'timeline',   label: mkLabel(GalleryVerticalEnd, 'timelineIcon',   'Timeline')       },
-  { id: 'hotspot',    label: mkLabel(Radio,              'hotspotIcon',     'File Hotspots')  },
-  { id: 'dayhour',    label: mkLabel(Clock2,             'dayHourIcon',     'Day × Hour')     },
-  { id: 'galaxy',     label: mkLabel(UserRound,          'contributorIcon', 'Contributors')   },
-  { id: 'repocity',   label: mkLabel(Building2,          'cityIcon',        'Repo City')      },
-  { id: 'branches',   label: mkLabel(GitBranch,          'branchIcon',      'Branches')       },
-  { id: 'halloffame', label: mkLabel(Trophy,             'hofIcon',         'Hall of Fame')   },
-  { id: 'insights',   label: mkLabel(Bot,                'aiIcon',          'AI Insights')    },
+  { id: 'timeline',   label: mkLabel(GalleryVerticalEnd, 'timelineIcon',   'Timeline',     'Timeline')   },
+  { id: 'hotspot',    label: mkLabel(Radio,              'hotspotIcon',     'File Hotspots','Hotspots')   },
+  { id: 'dayhour',    label: mkLabel(Clock2,             'dayHourIcon',     'Day × Hour',   'Day×Hr')     },
+  { id: 'galaxy',     label: mkLabel(UserRound,          'contributorIcon', 'Contributors', 'Contribs')   },
+  { id: 'repocity',   label: mkLabel(Building2,          'cityIcon',        'Repo City',    'City')       },
+  { id: 'branches',   label: mkLabel(GitBranch,          'branchIcon',      'Branches',     'Branches')   },
+  { id: 'halloffame', label: mkLabel(Trophy,             'hofIcon',         'Hall of Fame', 'Fame')       },
+  { id: 'insights',   label: mkLabel(Bot,                'aiIcon',          'AI Insights',  'AI')         },
 ]
 
-// ── Dashboard ─────────────────────────────────────────────────────────────────
 export default function Dashboard({ data, onReset }) {
   const {
     repoInfo, commits, contributors, hourDay,
     fileList, fileActivity, branches, collabEdges, owner, repo,
   } = data
+
+  const isMobile = useIsMobile()
 
   const [playing,     setPlaying]     = useState(false)
   const [idx,         setIdx]         = useState(0)
@@ -58,7 +57,6 @@ export default function Dashboard({ data, onReset }) {
   const playRef = useRef()
   const token   = data.token || null
 
-  // ── Filtered commits ───────────────────────────────────────────────────────
   const filteredCommits = useMemo(() => {
     return commits.filter(commit => {
       const author = commit?.author?.login || commit?.commit?.author?.name
@@ -74,7 +72,6 @@ export default function Dashboard({ data, onReset }) {
     })
   }, [commits, filters])
 
-  // ── Filetype-filtered file lists for heatmap tabs ─────────────────────────
   const filteredFileList = useMemo(() => {
     if (!filters.fileType || filters.fileType === 'all') return fileList
     return fileList.filter(f => f.file.endsWith(filters.fileType))
@@ -89,7 +86,6 @@ export default function Dashboard({ data, onReset }) {
     return out
   }, [fileActivity, filters.fileType])
 
-  // ── Jump to SHA / date ────────────────────────────────────────────────────
   useEffect(() => {
     const q = (filters.jumpQuery || '').trim().toLowerCase()
     if (!q) return
@@ -99,7 +95,6 @@ export default function Dashboard({ data, onReset }) {
     if (found >= 0) setIdx(found)
   }, [filters.jumpQuery, filteredCommits])
 
-  // ── Playback ──────────────────────────────────────────────────────────────
   const speed    = parseFloat(filters.speed || '1')
   const interval = Math.round(380 / speed)
 
@@ -127,33 +122,39 @@ export default function Dashboard({ data, onReset }) {
   const authorColor = getAuthorColor(authorLogin, contributors)
   const commitDate  = commit && new Date(commit.commit?.author?.date)
 
+  // Stats — show fewer on mobile
+  const allStats = [
+    [commits.length.toLocaleString(),                      'Commits'],
+    [contributors.length,                                  'Contributors'],
+    [repoInfo?.stargazers_count?.toLocaleString() || '—', '⭐ Stars'],
+    [repoInfo?.language || '—',                           'Language'],
+    [(branches || []).length || '—',                      '🌿 Branches'],
+  ]
+  const visibleStats = isMobile ? allStats.slice(0, 2) : allStats
+
   return (
     <div style={{ minHeight: '100vh', position: 'relative', zIndex: 1, paddingBottom: 60 }}>
       <div style={{ position: 'fixed', top: '5%', right: '5%', width: 400, height: 400, background: 'radial-gradient(circle,rgba(139,92,246,0.07) 0%,transparent 70%)', pointerEvents: 'none' }}/>
 
       {/* ── Header ── */}
-      <header style={S.header}>
-        <button onClick={onReset} style={S.backBtn}>← New Repo</button>
-        <div>
-          <div style={S.headerBadge}>◈ GitLens · Git History Time Traveller</div>
-          <div style={S.headerRepo}>{owner}/{repo}</div>
+      <header style={{ ...S.header, padding: isMobile ? '10px 14px' : '14px 24px', gap: isMobile ? 10 : 16 }}>
+        <button onClick={onReset} style={S.backBtn}>← {isMobile ? '' : 'New Repo'}</button>
+        <div style={{ minWidth: 0 }}>
+          <div style={{ ...S.headerBadge, display: isMobile ? 'none' : 'block' }}>◈ GitLens · Git History Time Traveller</div>
+          <div style={{ ...S.headerRepo, fontSize: isMobile ? 12 : 14, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: isMobile ? '40vw' : 'none' }}>
+            {owner}/{repo}
+          </div>
         </div>
         <div style={{ flex: 1 }} />
-        {[
-          [commits.length.toLocaleString(),                          'Commits'],
-          [contributors.length,                                      'Contributors'],
-          [repoInfo?.stargazers_count?.toLocaleString() || '—',     '⭐ Stars'],
-          [repoInfo?.language || '—',                               'Language'],
-          [(branches || []).length || '—',                          '🌿 Branches'],
-        ].map(([v, l]) => (
-          <div key={l} style={S.stat}>
-            <div style={S.statVal}>{v}</div>
-            <div style={S.statLbl}>{l}</div>
+        {visibleStats.map(([v, l]) => (
+          <div key={l} style={{ ...S.stat, minWidth: isMobile ? 40 : 'auto' }}>
+            <div style={{ ...S.statVal, fontSize: isMobile ? 13 : 17 }}>{v}</div>
+            <div style={{ ...S.statLbl, fontSize: isMobile ? 9 : 10 }}>{l}</div>
           </div>
         ))}
       </header>
 
-      <div style={S.content}>
+      <div style={{ ...S.content, padding: isMobile ? '14px 12px' : '24px 18px' }}>
 
         {/* ── Filter bar ── */}
         <FilterBar
@@ -163,8 +164,8 @@ export default function Dashboard({ data, onReset }) {
         />
 
         {/* ── Player ── */}
-        <div style={S.player}>
-          <div style={S.controls}>
+        <div style={{ ...S.player, padding: isMobile ? 14 : 20 }}>
+          <div style={{ ...S.controls, gap: isMobile ? 6 : 10 }}>
             <button
               onClick={togglePlay}
               style={{ ...S.playBtn, background: playing ? 'rgba(239,68,68,0.2)' : 'linear-gradient(135deg,#6366f1,#8b5cf6)', borderColor: playing ? '#ef4444' : '#6366f1' }}
@@ -173,8 +174,8 @@ export default function Dashboard({ data, onReset }) {
             </button>
             <button onClick={() => setIdx(Math.max(0, idx - 1))}                          style={S.stepBtn}>◀</button>
             <button onClick={() => setIdx(Math.min(filteredCommits.length - 1, idx + 1))} style={S.stepBtn}>▶</button>
-            <button onClick={() => setIdx(0)}                                              style={S.stepBtn}>⏮</button>
-            <button onClick={() => setIdx(filteredCommits.length - 1)}                    style={S.stepBtn}>⏭</button>
+            {!isMobile && <button onClick={() => setIdx(0)}                               style={S.stepBtn}>⏮</button>}
+            {!isMobile && <button onClick={() => setIdx(filteredCommits.length - 1)}      style={S.stepBtn}>⏭</button>}
 
             {commit && (
               <div
@@ -184,39 +185,46 @@ export default function Dashboard({ data, onReset }) {
               >
                 <div style={{ width: 8, height: 8, borderRadius: '50%', background: authorColor, boxShadow: `0 0 8px ${authorColor}`, flexShrink: 0 }}/>
                 <div style={{ minWidth: 0 }}>
-                  <div style={S.commitMsg}>{commit.commit?.message?.split('\n')[0]}</div>
-                  <div style={S.commitMeta}>
-                    <span style={{ color: authorColor }}>{authorLogin}</span>
-                    {' · '}
-                    {commitDate && !isNaN(commitDate) ? fmtDate(commitDate.toISOString()) : ''}
-                    {' · '}
-                    <span style={{ color: '#475569' }}>{commit.sha?.slice(0, 7)}</span>
-                    <span style={{ color: '#334155', marginLeft: 6, fontSize: 10 }}>↗ click for diff</span>
+                  <div style={{ ...S.commitMsg, fontSize: isMobile ? 11 : 13 }}>
+                    {commit.commit?.message?.split('\n')[0]}
                   </div>
+                  {!isMobile && (
+                    <div style={S.commitMeta}>
+                      <span style={{ color: authorColor }}>{authorLogin}</span>
+                      {' · '}
+                      {commitDate && !isNaN(commitDate) ? fmtDate(commitDate.toISOString()) : ''}
+                      {' · '}
+                      <span style={{ color: '#475569' }}>{commit.sha?.slice(0, 7)}</span>
+                      <span style={{ color: '#334155', marginLeft: 6, fontSize: 10 }}>↗ diff</span>
+                    </div>
+                  )}
                 </div>
               </div>
             )}
-            <div style={S.counter}>{idx + 1} / {filteredCommits.length}</div>
+            <div style={{ ...S.counter, fontSize: isMobile ? 10 : 11 }}>{idx + 1}/{filteredCommits.length}</div>
           </div>
           <TimelineBars commits={filteredCommits} currentIdx={idx} onSeek={setIdx} contributors={contributors} />
         </div>
 
         {/* ── Tabs ── */}
-        <div style={S.tabBar}>
+        <div style={{ ...S.tabBar, overflowX: 'auto', flexWrap: 'nowrap', WebkitOverflowScrolling: 'touch' }}>
           {TABS.map(t => (
             <button key={t.id} onClick={() => setTab(t.id)} style={{
               ...S.tabBtn,
+              flexShrink: 0,
+              padding: isMobile ? '8px 10px' : '9px 10px',
+              fontSize: isMobile ? 11 : 12,
               background:   tab === t.id ? 'rgba(99,102,241,0.22)' : 'transparent',
               color:        tab === t.id ? '#a5b4fc' : '#475569',
               borderBottom: tab === t.id ? '2px solid #6366f1'     : '2px solid transparent',
             }}>
-              {t.label}
+              {t.label(isMobile)}
             </button>
           ))}
         </div>
 
         {/* ── Panels ── */}
-        <div style={S.panel}>
+        <div style={{ ...S.panel, padding: isMobile ? 14 : 24 }}>
 
           {tab === 'timeline' && (
             <CommitGrid commits={filteredCommits} currentIdx={idx} onSeek={setIdx} contributors={contributors} onCommitClick={setModalCommit} />
@@ -283,23 +291,23 @@ function Empty({ msg }) {
 }
 
 const S = {
-  header:     { padding: '14px 24px', borderBottom: '1px solid rgba(255,255,255,0.06)', backdropFilter: 'blur(16px)', background: 'rgba(2,6,23,0.82)', display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap', position: 'sticky', top: 0, zIndex: 50 },
-  backBtn:    { background: 'none', border: '1px solid rgba(255,255,255,0.1)', color: '#475569', fontSize: 12, padding: '6px 12px', borderRadius: 8, fontFamily: "'JetBrains Mono',monospace", cursor: 'pointer' },
+  header:     { borderBottom: '1px solid rgba(255,255,255,0.06)', backdropFilter: 'blur(16px)', background: 'rgba(2,6,23,0.82)', display: 'flex', alignItems: 'center', flexWrap: 'nowrap', position: 'sticky', top: 0, zIndex: 50 },
+  backBtn:    { background: 'none', border: '1px solid rgba(255,255,255,0.1)', color: '#475569', fontSize: 12, padding: '6px 12px', borderRadius: 8, fontFamily: "'JetBrains Mono',monospace", cursor: 'pointer', flexShrink: 0 },
   headerBadge:{ fontSize: 10, letterSpacing: '0.3em', color: '#818cf8', fontFamily: "'JetBrains Mono',monospace", textTransform: 'uppercase' },
-  headerRepo: { color: '#e2e8f0', fontWeight: 700, fontSize: 14, fontFamily: "'JetBrains Mono',monospace" },
-  stat:       { textAlign: 'center' },
-  statVal:    { fontSize: 17, fontWeight: 800, color: '#a5b4fc', fontFamily: "'JetBrains Mono',monospace" },
-  statLbl:    { fontSize: 10, color: '#334155', fontFamily: "'JetBrains Mono',monospace" },
-  content:    { maxWidth: 1280, margin: '0 auto', padding: '24px 18px' },
-  player:     { background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 20, padding: 20, marginBottom: 22, backdropFilter: 'blur(8px)' },
-  controls:   { display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16, flexWrap: 'wrap' },
+  headerRepo: { color: '#e2e8f0', fontWeight: 700, fontFamily: "'JetBrains Mono',monospace" },
+  stat:       { textAlign: 'center', flexShrink: 0 },
+  statVal:    { fontWeight: 800, color: '#a5b4fc', fontFamily: "'JetBrains Mono',monospace" },
+  statLbl:    { color: '#334155', fontFamily: "'JetBrains Mono',monospace" },
+  content:    { maxWidth: 1280, margin: '0 auto' },
+  player:     { background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 20, marginBottom: 22, backdropFilter: 'blur(8px)' },
+  controls:   { display: 'flex', alignItems: 'center', marginBottom: 16, flexWrap: 'nowrap' },
   playBtn:    { width: 44, height: 44, borderRadius: '50%', border: '1px solid', color: '#fff', fontSize: 16, flexShrink: 0, cursor: 'pointer' },
-  stepBtn:    { width: 33, height: 33, borderRadius: '50%', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.09)', color: '#64748b', fontSize: 13, cursor: 'pointer' },
-  commitInfo: { display: 'flex', alignItems: 'center', gap: 10, flex: 1, minWidth: 0, padding: '6px 10px', borderRadius: 8, background: 'rgba(255,255,255,0.03)', transition: 'background 0.15s' },
-  commitMsg:  { color: '#f1f5f9', fontWeight: 600, fontSize: 13, fontFamily: "'JetBrains Mono',monospace", overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
+  stepBtn:    { width: 33, height: 33, borderRadius: '50%', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.09)', color: '#64748b', fontSize: 13, cursor: 'pointer', flexShrink: 0 },
+  commitInfo: { display: 'flex', alignItems: 'center', gap: 10, flex: 1, minWidth: 0, padding: '6px 10px', borderRadius: 8, background: 'rgba(255,255,255,0.03)', transition: 'background 0.15s', overflow: 'hidden' },
+  commitMsg:  { color: '#f1f5f9', fontWeight: 600, fontFamily: "'JetBrains Mono',monospace", overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
   commitMeta: { color: '#334155', fontSize: 11, fontFamily: "'JetBrains Mono',monospace" },
-  counter:    { color: '#334155', fontFamily: "'JetBrains Mono',monospace", fontSize: 11, flexShrink: 0 },
-  tabBar:     { display: 'flex', gap: 4, marginBottom: 18, background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 14, padding: 5, flexWrap: 'wrap' },
-  tabBtn:     { flex: '1 1 auto', padding: '9px 10px', borderRadius: 10, border: 'none', fontWeight: 600, fontSize: 12, transition: 'all 0.18s', cursor: 'pointer' },
-  panel:      { background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 20, padding: 24, backdropFilter: 'blur(8px)' },
+  counter:    { color: '#334155', fontFamily: "'JetBrains Mono',monospace", flexShrink: 0 },
+  tabBar:     { display: 'flex', gap: 4, marginBottom: 18, background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 14, padding: 5 },
+  tabBtn:     { flex: '0 0 auto', borderRadius: 10, border: 'none', fontWeight: 600, transition: 'all 0.18s', cursor: 'pointer' },
+  panel:      { background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 20, backdropFilter: 'blur(8px)' },
 }

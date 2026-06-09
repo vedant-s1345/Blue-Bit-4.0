@@ -125,3 +125,20 @@ transition:all 0.25s ease;
 transform:scale(1.25) rotate(10deg);
 filter:drop-shadow(0 0 8px #8b5cf6);
 }
+
+/* ── Mobile tab bar scrollbar hide ─────────────────────────────────────────── */
+@media (max-width: 640px) {
+  .filter-bar {
+    gap: 10px;
+    padding: 10px 12px;
+  }
+
+  /* Hide scrollbar on tab strip but keep scrollability */
+  div[style*="overflowX: auto"] {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+  div[style*="overflowX: auto"]::-webkit-scrollbar {
+    display: none;
+  }
+}
