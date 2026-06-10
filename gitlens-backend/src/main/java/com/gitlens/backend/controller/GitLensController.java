@@ -203,4 +203,14 @@ public class GitLensController {
             return ResponseEntity.status(500).body(Map.of("error", e.getMessage()));
         }
     }
+    
+    @GetMapping("/find")
+    public ResponseEntity<?> findByUrl(@RequestParam String url) {
+        return repositoryRepo.findByUrl(url)
+            .map(r -> ResponseEntity.ok(Map.of(
+                "repositoryId", r.getId(),
+                "status", r.getStatus()
+            )))
+            .orElse(ResponseEntity.notFound().build());
+    }
 }
