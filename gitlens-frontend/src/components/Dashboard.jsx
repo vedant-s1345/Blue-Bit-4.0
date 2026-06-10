@@ -207,7 +207,7 @@ export default function Dashboard({ data, onReset }) {
         </div>
 
         {/* ── Tabs ── */}
-        <div style={{ ...S.tabBar, overflowX: 'auto', flexWrap: 'nowrap', WebkitOverflowScrolling: 'touch' }}>
+        <div style={{ ...S.tabBar, overflowX: isMobile ? 'auto' : 'visible', flexWrap: isMobile ? 'nowrap' : 'wrap', WebkitOverflowScrolling: 'touch' }}>
           {TABS.map(t => (
             <button key={t.id} onClick={() => setTab(t.id)} style={{
               ...S.tabBtn,

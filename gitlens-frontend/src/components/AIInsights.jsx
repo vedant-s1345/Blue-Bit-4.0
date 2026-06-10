@@ -30,8 +30,7 @@ export default function AIInsights({ data }) {
         if (!r.ok) throw new Error('Repo not yet stored in backend')
         return r.json()
       })
-      .then(({ repositoryId, status }) => {
-        if (status !== 'COMPLETED') throw new Error('Backend analysis not complete yet')
+      .then(({ repositoryId }) => {
         return fetch(`${API}/ai-insights/${repositoryId}`)
       })
       .then(r => {
