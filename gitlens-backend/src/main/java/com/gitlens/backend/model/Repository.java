@@ -36,6 +36,10 @@ public class Repository {
     @Column(name = "analyzed_at")
     private LocalDateTime analyzedAt;
 
+    // Nullable — anonymous analyses have no owner
+    @Column(name = "user_id")
+    private Long userId;
+
     @OneToMany(mappedBy = "repository", cascade = CascadeType.ALL)
     private List<Commit> commits;
 
@@ -71,6 +75,9 @@ public class Repository {
 
     public LocalDateTime getAnalyzedAt() { return analyzedAt; }
     public void setAnalyzedAt(LocalDateTime analyzedAt) { this.analyzedAt = analyzedAt; }
+
+    public Long getUserId()                   { return userId; }
+    public void setUserId(Long userId)         { this.userId = userId; }
 
     public List<Commit> getCommits() { return commits; }
     public void setCommits(List<Commit> commits) { this.commits = commits; }

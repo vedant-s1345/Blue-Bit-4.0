@@ -207,7 +207,7 @@ export default function Dashboard({ data, onReset }) {
         </div>
 
         {/* ── Tabs ── */}
-        <div style={{ ...S.tabBar, overflowX: isMobile ? 'auto' : 'visible', flexWrap: isMobile ? 'nowrap' : 'wrap', WebkitOverflowScrolling: 'touch' }}>
+        <div style={{ ...S.tabBar, ...(isMobile ? { overflowX: 'auto', flexWrap: 'nowrap', WebkitOverflowScrolling: 'touch' } : {}) }}>
           {TABS.map(t => (
             <button key={t.id} onClick={() => setTab(t.id)} style={{
               ...S.tabBtn,
@@ -307,7 +307,7 @@ const S = {
   commitMsg:  { color: '#f1f5f9', fontWeight: 600, fontFamily: "'JetBrains Mono',monospace", overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
   commitMeta: { color: '#334155', fontSize: 11, fontFamily: "'JetBrains Mono',monospace" },
   counter:    { color: '#334155', fontFamily: "'JetBrains Mono',monospace", flexShrink: 0 },
-  tabBar:     { display: 'flex', gap: 4, marginBottom: 18, background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 14, padding: 5 },
-  tabBtn:     { flex: '0 0 auto', borderRadius: 10, border: 'none', fontWeight: 600, transition: 'all 0.18s', cursor: 'pointer' },
+  tabBar:     { display: 'flex', gap: 4, marginBottom: 18, background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 14, padding: 5, flexWrap: 'wrap', justifyContent: 'space-between' },
+  tabBtn:     { flex: '1 1 auto', borderRadius: 10, border: 'none', fontWeight: 600, transition: 'all 0.18s', cursor: 'pointer', whiteSpace: 'nowrap', textAlign: 'center' },
   panel:      { background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 20, backdropFilter: 'blur(8px)' },
 }
