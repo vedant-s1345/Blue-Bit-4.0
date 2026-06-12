@@ -89,3 +89,40 @@ export async function deleteMyRepo(repoId, token) {
   })
   if (!res.ok) throw new Error('Failed to remove repo')
 }
+
+// Save GitHub API data into DB under the logged-in user
+export async function saveRepoForUser(repoUrl, repoData, token) {
+  // 1. Store the actual commit/contributor/file data
+  await fetch(`${BASE}/store`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify({
+      repoUrl,
+      repoName: repoData.repo,
+      totalCommits: repoData.commits?.length ?? 0,
+      commits: repoData.commits?.map(c => ({
+        sha:         c.sha,
+        author:      c.author?.login || c.commit?.author?.name || 'unknown',
+        authorEmail: c.commit?.author?.email || '',
+        message:     c.commit?.message || '',
+        date:        c.commit?.author?.date || new Date().toISOString(),
+        additions:   c.linesAdded   ?? 0,
+        deletions:   c.linesDeleted ?? 0,
+      })) ?? [],
+      contributors: repoData.contributors?.map(c => ({
+        name:         c.login,
+        totalCommits: c.commits,
+        linesAdded:   c.linesAdded   ?? 0,
+        linesDeleted: c.linesDeleted ?? 0,
+      })) ?? [],
+      files: repoData.fileList?.map(f => ({
+        filePath:    f.file,
+        churnScore:  f.churn  ?? f.changes ?? 0,
+        commitCount: f.changes ?? 0,
+      })) ?? [],
+    }),
+  })
+
+  // 2. Create the user bookmark so it shows in My Repos
+  await analyzeForUser(repoUrl, token)
+}

@@ -115,66 +115,41 @@ public class AnalyticsService {
     }
     
     @Transactional
-    public void storeFromFrontend(StoreRepoRequest req) {
-        Optional<Repository> existingOpt = repositoryRepo.findByUrl(req.getRepoUrl());
-        if (existingOpt.isPresent() && "COMPLETED".equals(existingOpt.get().getStatus())) return;
+    public void storeFromFrontend(StoreRepoRequest req, User user) {
+        Long userId = user != null ? user.getId() : null;
 
-        Repository repo = existingOpt.orElse(new Repository());
+        // Check if this user already has this repo saved
+        if (userId != null) {
+            Optional<Repository> existing = repositoryRepo.findByUrlAndUserId(req.getRepoUrl(), userId);
+            if (existing.isPresent() && "COMPLETED".equals(existing.get().getStatus())) return;
+        }
+
+        Repository repo = new Repository();
         repo.setUrl(req.getRepoUrl());
         repo.setName(req.getRepoName());
         repo.setTotalCommits(req.getTotalCommits());
         repo.setStatus("COMPLETED");
+        repo.setUserId(userId);
         repo.setCreatedAt(LocalDateTime.now());
         repo.setAnalyzedAt(LocalDateTime.now());
         repositoryRepo.save(repo);
 
         final Repository savedRepo = repo;
 
-        if (req.getCommits() != null) {
-            req.getCommits().forEach(c -> {
-                if (commitRepo.existsByCommitHashAndRepositoryId(c.getSha(), savedRepo.getId())) return;
-                Commit commit = new Commit();
-                commit.setCommitHash(c.getSha());
-                commit.setAuthor(c.getAuthor());
-                commit.setAuthorEmail(c.getAuthorEmail() != null ? c.getAuthorEmail() : "");
-                commit.setMessage(c.getMessage());
-                commit.setLinesAdded(c.getAdditions());
-                commit.setLinesDeleted(c.getDeletions());
-                try {
-                    commit.setCommitDate(LocalDateTime.parse(
-                        c.getDate(), DateTimeFormatter.ISO_DATE_TIME));
-                } catch (Exception e) {
-                    commit.setCommitDate(LocalDateTime.now());
-                }
-                commit.setRepository(savedRepo);
-                commitRepo.save(commit);
-            });
-        }
-
-        if (req.getContributors() != null) {
-            req.getContributors().forEach(c -> {
-                Contributor contributor = new Contributor();
-                contributor.setName(c.getName());
-                contributor.setEmail(c.getName() + "@github");
-                contributor.setTotalCommits(c.getTotalCommits());
-                contributor.setLinesAdded(c.getLinesAdded());
-                contributor.setLinesDeleted(c.getLinesDeleted());
-                contributor.setRepository(savedRepo);
-                contributorRepo.save(contributor);
-            });
-        }
-
-        if (req.getFiles() != null) {
-            req.getFiles().forEach(f -> {
-                GitFile gitFile = new GitFile();
-                gitFile.setFilePath(f.getFilePath());
-                gitFile.setChurnScore(f.getChurnScore());
-                gitFile.setCommitCount(f.getCommitCount());
-                gitFile.setHotspotScore((double) f.getChurnScore());
-                gitFile.setBusFactor(1);
-                gitFile.setRepository(savedRepo);
-                gitFileRepo.save(gitFile);
-            });
+        // Save contributors
+        if (req.getContributors() != null && !req.getContributors().isEmpty()) {
+            List<Contributor> contributors = req.getContributors().stream()
+                .map(c -> {
+                    Contributor contributor = new Contributor();
+                    contributor.setName(c.getName());
+                    contributor.setEmail(c.getName() + "@github");
+                    contributor.setTotalCommits(c.getTotalCommits());
+                    contributor.setLinesAdded(c.getLinesAdded());
+                    contributor.setLinesDeleted(c.getLinesDeleted());
+                    contributor.setRepository(savedRepo);
+                    return contributor;
+                }).collect(Collectors.toList());
+            contributorRepo.saveAll(contributors);
         }
     }
 }

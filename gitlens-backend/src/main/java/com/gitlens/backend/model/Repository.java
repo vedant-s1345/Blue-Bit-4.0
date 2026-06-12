@@ -7,7 +7,7 @@ import java.util.List;
 
 @Entity
 @Table(name = "repositories", uniqueConstraints = {
-	    @UniqueConstraint(columnNames = "url")
+	    @UniqueConstraint(columnNames = {"url", "user_id"})
 	})
 public class Repository {
 

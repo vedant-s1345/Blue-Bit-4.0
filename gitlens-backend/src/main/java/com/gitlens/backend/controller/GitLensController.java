@@ -4,9 +4,11 @@ import com.gitlens.backend.dto.*;
 import com.gitlens.backend.dto.ChatRequest;
 import com.gitlens.backend.gitparser.GitParserService;
 import com.gitlens.backend.model.Repository;
+import com.gitlens.backend.model.User;
 import com.gitlens.backend.repository.RepositoryRepo;
 import com.gitlens.backend.service.AnalyticsService;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 import com.gitlens.backend.service.AiInsightService;
 import org.springframework.data.domain.Page;
@@ -15,6 +17,7 @@ import org.springframework.data.web.PageableDefault;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 @RestController
 @RequestMapping("/api")
@@ -49,26 +52,23 @@ public class GitLensController {
     	}
 
         // Check if already analyzed
-        var existing = repositoryRepo.findByUrl(request.getRepoUrl());
-        if (existing.isPresent()) {
-            String currentStatus = existing.get().getStatus();
-
-            // If FAILED, reset and allow re-analysis
-            if ("FAILED".equals(currentStatus)) {
-                existing.get().setStatus("PENDING");
-                repositoryRepo.save(existing.get());
-                gitParserService.parseRepository(existing.get().getId());
-                return ResponseEntity.ok(Map.of(
-                    "message", "Re-analysis started for previously failed repository",
-                    "repositoryId", existing.get().getId(),
+    	List<Repository> existingList = repositoryRepo.findByUrlAndUserIdIsNull(request.getRepoUrl());
+    	if (!existingList.isEmpty()) {
+    	    Repository existing = existingList.get(0);
+    	    String currentStatus = existing.getStatus();
+    	    if ("FAILED".equals(currentStatus)) {
+    	        existing.setStatus("PENDING");
+    	        repositoryRepo.save(existing);
+    	        gitParserService.parseRepository(existing.getId());
+    	        return ResponseEntity.ok(Map.of(
+                    "repositoryId", existing.getId(),
                     "status", "PENDING"
                 ));
             }
 
             // If already COMPLETED or PROCESSING, just return current state
             return ResponseEntity.ok(Map.of(
-                "message", "Repository already exists",
-                "repositoryId", existing.get().getId(),
+                "repositoryId", existing.getId(),
                 "status", currentStatus
             ));
         }
@@ -95,12 +95,12 @@ public class GitLensController {
             ));
         } catch (Exception e) {
             // Handles rare race condition where two requests sneak past the duplicate check
-            var raceConditionRepo = repositoryRepo.findByUrl(url);
-            if (raceConditionRepo.isPresent()) {
-                return ResponseEntity.ok(Map.of(
-                    "message", "Repository already exists",
-                    "repositoryId", raceConditionRepo.get().getId(),
-                    "status", raceConditionRepo.get().getStatus()
+        	List<Repository> raceList = repositoryRepo.findByUrlAndUserIdIsNull(url);
+        	if (!raceList.isEmpty()) {
+        	    Repository raceConditionRepo = raceList.get(0);
+        	    return ResponseEntity.ok(Map.of(
+        	        "repositoryId", raceConditionRepo.getId(),
+        	        "status", raceConditionRepo.getStatus()
                 ));
             }
             return ResponseEntity.internalServerError()
@@ -195,9 +195,10 @@ public class GitLensController {
     }
     
     @PostMapping("/store")
-    public ResponseEntity<?> storeRepo(@RequestBody StoreRepoRequest req) {
+    public ResponseEntity<?> storeRepo(@RequestBody StoreRepoRequest req,
+                                       @AuthenticationPrincipal User user) {
         try {
-            analyticsService.storeFromFrontend(req);
+            analyticsService.storeFromFrontend(req, user);
             return ResponseEntity.ok(Map.of("message", "Stored successfully"));
         } catch (Exception e) {
             return ResponseEntity.status(500).body(Map.of("error", e.getMessage()));
@@ -205,12 +206,28 @@ public class GitLensController {
     }
     
     @GetMapping("/find")
-    public ResponseEntity<?> findByUrl(@RequestParam String url) {
-        return repositoryRepo.findByUrl(url)
-            .map(r -> ResponseEntity.ok(Map.of(
-                "repositoryId", r.getId(),
-                "status", r.getStatus()
-            )))
-            .orElse(ResponseEntity.notFound().build());
+    public ResponseEntity<?> findByUrl(@RequestParam String url,
+                                       @AuthenticationPrincipal User user) {
+        // Try user-specific record first
+        if (user != null) {
+            Optional<Repository> userRepo = repositoryRepo.findByUrlAndUserId(url, user.getId());
+            if (userRepo.isPresent()) {
+                return ResponseEntity.ok(Map.of(
+                    "repositoryId", userRepo.get().getId(),
+                    "status", userRepo.get().getStatus()
+                ));
+            }
+        }
+
+        // Fallback — try any record with this URL
+        List<Repository> found = repositoryRepo.findByUrlAndUserIdIsNull(url);
+        if (!found.isEmpty()) {
+            return ResponseEntity.ok(Map.of(
+                "repositoryId", found.get(0).getId(),
+                "status", found.get(0).getStatus()
+            ));
+        }
+
+        return ResponseEntity.notFound().build();
     }
 }

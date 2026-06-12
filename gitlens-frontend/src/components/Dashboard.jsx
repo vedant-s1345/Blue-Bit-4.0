@@ -259,7 +259,7 @@ export default function Dashboard({ data, onReset }) {
           )}
 
           {tab === 'insights' && (
-            <AIInsights data={data} />
+            <AIInsights data={data} token={token} />
           )}
 
         </div>

@@ -2,10 +2,13 @@ import { PALETTE } from './constants.js'
 
 const GH = 'https://api.github.com'
 
+const ENV_TOKEN = import.meta.env.VITE_GITHUB_TOKEN || null
+
 async function ghFetch(url, token) {
+  const activeToken = token || ENV_TOKEN   // ← use env token if none passed from UI
   const headers = {
     Accept: 'application/vnd.github+json',
-    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    ...(activeToken ? { Authorization: `Bearer ${activeToken}` } : {}),
   }
   const res = await fetch(url, { headers })
   if (!res.ok) throw new Error(`GitHub ${res.status}: ${res.statusText}`)
@@ -84,7 +87,7 @@ function runSync(commits) {
   return { contributors, hourDay, collabEdges, busFactorPct }
 }
 
-export async function loadRepo(owner, repo, token, onProgress) {
+export async function loadRepo(owner, repo, token, onProgress, userToken = null) {
   onProgress('Fetching repository info…', 8)
   const repoInfo = await ghFetch(`${GH}/repos/${owner}/${repo}`, token)
 
@@ -154,42 +157,69 @@ export async function loadRepo(owner, repo, token, onProgress) {
       risk:  f.changes > 8 ? 'critical' : f.changes > 5 ? 'high' : f.changes > 2 ? 'medium' : 'low',
     }))
 
-  onProgress('Done!', 100)
 
-  // Store in backend DB (non-blocking, best-effort)
+  // // Store in backend DB (non-blocking, best-effort)
+  // try {
+  //   const apiBase = import.meta.env.VITE_API_BASE || 'http://localhost:8082/api'
+  //   await fetch(`${apiBase}/store`, {
+  //     method: 'POST',
+  //     headers: { 'Content-Type': 'application/json' },
+  //     body: JSON.stringify({
+  //       repoUrl: `https://github.com/${owner}/${repo}`,
+  //       repoName: `${owner}/${repo}`,
+  //       totalCommits: commits.length,
+  //       commits: commits.slice(0, 100).map(c => ({
+  //         sha: c.sha,
+  //         author: c.commit?.author?.name || 'unknown',
+  //         authorEmail: c.commit?.author?.email || '',
+  //         message: c.commit?.message || '',
+  //         date: c.commit?.author?.date || new Date().toISOString(),
+  //         additions: 0,
+  //         deletions: 0
+  //       })),
+  //       contributors: contributors.map(c => ({
+  //         name: c.login,
+  //         totalCommits: c.commits,
+  //         linesAdded: 0,
+  //         linesDeleted: 0
+  //       })),
+  //       files: fileList.map(f => ({
+  //         filePath: f.file,
+  //         churnScore: f.churn,
+  //         commitCount: f.changes,
+  //         risk: f.risk
+  //       }))
+  //     })
+  //   }).catch(() => {})
+  // } catch (_) {}
+
+
+  // Store lightweight bookmark in backend DB
   try {
     const apiBase = import.meta.env.VITE_API_BASE || 'http://localhost:8082/api'
-    fetch(`${apiBase}/store`, {
+    await fetch(`${apiBase}/store`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        ...(userToken ? { Authorization: `Bearer ${userToken}` } : {})
+      },
       body: JSON.stringify({
         repoUrl: `https://github.com/${owner}/${repo}`,
         repoName: `${owner}/${repo}`,
         totalCommits: commits.length,
-        commits: commits.slice(0, 100).map(c => ({
-          sha: c.sha,
-          author: c.commit?.author?.name || 'unknown',
-          authorEmail: c.commit?.author?.email || '',
-          message: c.commit?.message || '',
-          date: c.commit?.author?.date || new Date().toISOString(),
-          additions: 0,
-          deletions: 0
-        })),
+        commits: [],
         contributors: contributors.map(c => ({
           name: c.login,
           totalCommits: c.commits,
           linesAdded: 0,
           linesDeleted: 0
         })),
-        files: fileList.map(f => ({
-          filePath: f.file,
-          churnScore: f.churn,
-          commitCount: f.changes,
-          risk: f.risk
-        }))
+        files: []
       })
-    }).catch(() => {})
+    })
   } catch (_) {}
+
+  onProgress('Done!', 100)
 
   return {
     repoInfo, commits, contributors,

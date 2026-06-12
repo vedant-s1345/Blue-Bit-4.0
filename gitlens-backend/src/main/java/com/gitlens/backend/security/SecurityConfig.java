@@ -24,31 +24,39 @@ public class SecurityConfig {
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         http
             .csrf(csrf -> csrf.disable())
+            .cors(cors -> cors.configurationSource(request -> {
+                var config = new org.springframework.web.cors.CorsConfiguration();
+                config.setAllowCredentials(true);
+                config.addAllowedOrigin("http://localhost:5173");
+                config.addAllowedOrigin("http://localhost:3000");
+                config.addAllowedOriginPattern("https://*.vercel.app");
+                config.addAllowedHeader("*");
+                config.addAllowedMethod("*");
+                return config;
+            }))
             .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(auth -> auth
-                // Public endpoints — no token needed
+                .requestMatchers(org.springframework.http.HttpMethod.OPTIONS, "/**").permitAll() // ← ADD THIS
                 .requestMatchers(
-                    "/api/auth/**",   // register + login
-                    "/api/analyze",   // anonymous parse
-                    "/api/status/**", // polling
+                    "/api/auth/**",
+                    "/api/analyze",
+                    "/api/status/**",
                     "/api/timeline/**",
                     "/api/heatmap/**",
                     "/api/contributors/**",
                     "/api/ai-insights/**",
                     "/api/chat",
-                    "/api/store",
                     "/api/find",
                     "/actuator/**"
                 ).permitAll()
-                // User-scoped endpoints require JWT
-                .requestMatchers("/api/user/**").authenticated()
+                .requestMatchers("/api/user/**", "/api/store").authenticated()
                 .anyRequest().permitAll()
             )
             .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
     }
-
+    
     @Bean
     public PasswordEncoder passwordEncoder() {
         return new BCryptPasswordEncoder();

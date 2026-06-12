@@ -10,7 +10,7 @@ const COLORS = {
 
 const API = import.meta.env.VITE_API_BASE || 'http://localhost:8082/api'
 
-export default function AIInsights({ data }) {
+export default function AIInsights({ data, token }) {
   const { contributors, busFactorPct, totalCommits, fileList, collabEdges, commits, owner, repo } = data
   const [open,       setOpen]       = useState(null)
   const [aiLoading,  setAiLoading]  = useState(false)
@@ -25,7 +25,9 @@ export default function AIInsights({ data }) {
     setAiError(null)
 
     // First find the repo ID by URL
-    fetch(`${API}/find?url=${encodeURIComponent(repoUrl)}`)
+    fetch(`${API}/find?url=${encodeURIComponent(repoUrl)}`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {}
+    })
       .then(r => {
         if (!r.ok) throw new Error('Repo not yet stored in backend')
         return r.json()
@@ -45,7 +47,7 @@ export default function AIInsights({ data }) {
         setAiError(err.message)
         setAiLoading(false)
       })
-  }, [owner, repo])
+  }, [owner, repo, token])
 
   const top     = contributors[0]
   const topPair = collabEdges[0]

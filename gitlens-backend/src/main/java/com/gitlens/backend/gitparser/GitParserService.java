@@ -111,6 +111,13 @@ public class GitParserService {
             repo.setStatus("COMPLETED");
             repo.setAnalyzedAt(LocalDateTime.now());
             repositoryRepo.save(repo);
+            
+            repositoryRepo.findByUrlAndUserIdIsNotNull(repo.getUrl()).forEach(bookmark -> {
+                bookmark.setStatus("COMPLETED");
+                bookmark.setTotalCommits((int) totalCommits);
+                bookmark.setAnalyzedAt(LocalDateTime.now());
+                repositoryRepo.save(bookmark);
+            });
 
             deleteDirectory(new File(localPath));
 

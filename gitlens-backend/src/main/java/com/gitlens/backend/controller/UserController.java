@@ -12,6 +12,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -39,16 +40,13 @@ public class UserController {
     // ── GET /api/user/repos ────────────────────────────────────────────────────
     @GetMapping("/repos")
     public ResponseEntity<?> getMyRepos(@AuthenticationPrincipal User user) {
+        if (user == null)
+            return ResponseEntity.status(401).body(Map.of("error", "Not authenticated"));
+
         List<UserRepoSummary> list = repositoryRepo
             .findByUserIdOrderByCreatedAtDesc(user.getId())
             .stream()
-            .map(bookmark -> {
-                // For each bookmark, find the canonical data record so we can
-                // return accurate commit counts and analyzedAt
-                Optional<Repository> completed = repositoryRepo.findByUrl(bookmark.getUrl());
-                Repository dataSource = completed.isEmpty() ? bookmark : completed.get();
-                return toSummary(bookmark, dataSource);
-            })
+            .map(repo -> toSummary(repo, repo))  // ← same record is both bookmark and data
             .collect(Collectors.toList());
         return ResponseEntity.ok(list);
     }
@@ -57,106 +55,35 @@ public class UserController {
     @PostMapping("/analyze")
     public ResponseEntity<?> analyzeForUser(@RequestBody RepoSubmitRequest request,
                                             @AuthenticationPrincipal User user) {
-        if (request.getRepoUrl() == null || request.getRepoUrl().isBlank())
-            return ResponseEntity.badRequest().body(Map.of("error", "repoUrl is required"));
+        if (user == null)
+            return ResponseEntity.status(401).body(Map.of("error", "Not authenticated"));
 
         String url = normalizeUrl(request.getRepoUrl().trim());
 
-        // 1. User already has a bookmark for this URL
-        Optional<Repository> existingBookmark = repositoryRepo.findByUrlAndUserId(url, user.getId());
-        if (existingBookmark.isPresent()) {
-            Repository bm = existingBookmark.get();
-            if ("COMPLETED".equals(bm.getStatus())) {
-                // Find the canonical data record to return its id
-                Optional<Repository> completed = repositoryRepo.findByUrl(url);
-                Long dataId = completed.isEmpty() ? bm.getId() : completed.get().getId();
-                return ResponseEntity.ok(Map.of(
-                    "message", "Already saved — loading cached results",
-                    "repositoryId", dataId,
-                    "bookmarkId", bm.getId(),
-                    "status", "COMPLETED",
-                    "cached", true
-                ));
-            }
-            if ("FAILED".equals(bm.getStatus())) {
-                bm.setStatus("PENDING");
-                repositoryRepo.save(bm);
-                gitParserService.parseRepository(bm.getId());
-                return ResponseEntity.ok(Map.of(
-                    "message", "Re-analyzing previously failed repository",
-                    "repositoryId", bm.getId(),
-                    "status", "PENDING",
-                    "cached", false
-                ));
-            }
-            // PENDING / PROCESSING
+        // Check if this user already has this repo
+        Optional<Repository> existing = repositoryRepo.findByUrlAndUserId(url, user.getId());
+        if (existing.isPresent()) {
             return ResponseEntity.ok(Map.of(
-                "message", "Analysis already in progress",
-                "repositoryId", bm.getId(),
-                "status", bm.getStatus(),
-                "cached", false
+                "message", "Already saved",
+                "repositoryId", existing.get().getId(),
+                "status", existing.get().getStatus(),
+                "cached", "COMPLETED".equals(existing.get().getStatus())
             ));
         }
 
-        // 2. No user bookmark yet — check if any global COMPLETED parse exists
-        Optional<Repository> completed = repositoryRepo.findByUrl(url);
-        if (!completed.isEmpty()) {
-            Repository global = completed.get();
-            // Create thin bookmark pointing to this URL
-            Repository bookmark = new Repository();
-            bookmark.setUrl(url);
-            bookmark.setName(global.getName());
-            bookmark.setStatus("COMPLETED");
-            bookmark.setTotalCommits(global.getTotalCommits());
-            bookmark.setDefaultBranch(global.getDefaultBranch());
-            bookmark.setUserId(user.getId());
-            bookmark.setAnalyzedAt(global.getAnalyzedAt());
-            repositoryRepo.save(bookmark);
-
-            return ResponseEntity.ok(Map.of(
-                "message", "Loaded from global cache",
-                "repositoryId", global.getId(),   // actual data lives here
-                "bookmarkId", bookmark.getId(),
-                "status", "COMPLETED",
-                "cached", true
-            ));
-        }
-
-        // 3. Completely new — create bookmark + kick off parse
-        String repoName = url.substring(url.lastIndexOf("/") + 1).replace(".git", "");
-        try {
-            Repository repo = new Repository();
-            repo.setUrl(url);
-            repo.setName(repoName);
-            repo.setStatus("PENDING");
-            repo.setUserId(user.getId());
-            repositoryRepo.save(repo);
-
-            gitParserService.parseRepository(repo.getId());
-
-            return ResponseEntity.ok(Map.of(
-                "message", "Analysis started",
-                "repositoryId", repo.getId(),
-                "status", "PENDING",
-                "cached", false
-            ));
-        } catch (Exception e) {
-            Optional<Repository> race = repositoryRepo.findByUrlAndUserId(url, user.getId());
-            if (race.isPresent())
-                return ResponseEntity.ok(Map.of(
-                    "repositoryId", race.get().getId(),
-                    "status", race.get().getStatus(),
-                    "cached", false
-                ));
-            return ResponseEntity.internalServerError()
-                    .body(Map.of("error", "Failed to start: " + e.getMessage()));
-        }
+        // Not saved yet — return not found so frontend knows to save via /store
+        return ResponseEntity.ok(Map.of(
+            "message", "Not saved yet",
+            "cached", false
+        ));
     }
 
     // ── DELETE /api/user/repos/{id} ───────────────────────────────────────────
     @DeleteMapping("/repos/{id}")
     public ResponseEntity<?> deleteRepo(@PathVariable Long id,
                                         @AuthenticationPrincipal User user) {
+        if (user == null)
+            return ResponseEntity.status(401).body(Map.of("error", "Not authenticated"));
         Optional<Repository> repo = repositoryRepo.findById(id);
         if (repo.isEmpty() || !user.getId().equals(repo.get().getUserId()))
             return ResponseEntity.notFound().build();
@@ -165,7 +92,6 @@ public class UserController {
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────
-
     private String normalizeUrl(String input) {
         if (input.startsWith("https://") || input.startsWith("http://"))
             return input.replaceAll("\\.git$", "").replaceAll("/$", "");

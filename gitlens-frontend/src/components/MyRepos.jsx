@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
-import { fetchMyRepos, deleteMyRepo, analyzeForUser } from '../utils/authApi.js'
-import { fetchRepoData, pollStatus } from '../utils/api.js'
-import { mapBackendData } from '../utils/backendMapper.js'
+import { fetchMyRepos, deleteMyRepo } from '../utils/authApi.js'
+// import { fetchRepoData, pollStatus } from '../utils/api.js'
+// import { mapBackendData } from '../utils/backendMapper.js'
 
 export default function MyRepos({ auth, onAnalyze, onClose }) {
   const [repos,    setRepos]    = useState([])
@@ -20,27 +20,19 @@ export default function MyRepos({ auth, onAnalyze, onClose }) {
 
   const openRepo = async (repo) => {
     setOpening(repo.id)
-    setStep('')
+    setStep('Fetching from GitHub…')
     setError('')
     try {
-      // Always call /api/user/analyze to get the canonical repositoryId
-      // (bookmark records point to the original parse; this returns the right id)
-      setStep('Resolving repository…')
-      const result = await analyzeForUser(repo.url, auth.token)
-      const repoId = result.repositoryId
+      const { loadRepo, parseRepoUrl } = await import('../utils/github.js')
+      const parsed = parseRepoUrl(repo.url)
+      if (!parsed) throw new Error('Invalid repo URL')
 
-      if (result.cached && result.status === 'COMPLETED') {
-        setStep('Loading analytics…')
-      } else {
-        setStep('Analysing… this may take a minute')
-        await pollStatus(repoId, (msg) => setStep(msg))
-        setStep('Loading analytics…')
-      }
-
-      const rawData = await fetchRepoData(repoId)
-      const fakeStatus = { id: repoId, status: 'COMPLETED' }
-      const dashData = mapBackendData(repo.url, fakeStatus, rawData)
-      onAnalyze({ ...dashData, token: null })
+      const data = await loadRepo(
+        parsed.owner, parsed.repo, null,
+        (msg) => setStep(msg),
+        auth.token   // pass JWT so store call updates contributors
+      )
+      onAnalyze({ ...data, token: null })
     } catch (e) {
       setError(e.message || 'Failed to open repo')
       setOpening(null)

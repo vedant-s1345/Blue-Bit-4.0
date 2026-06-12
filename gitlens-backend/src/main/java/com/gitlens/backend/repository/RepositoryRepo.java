@@ -9,4 +9,6 @@ public interface RepositoryRepo extends JpaRepository<Repository, Long> {
     Optional<Repository> findByUrl(String url);
     Optional<Repository> findByUrlAndUserId(String url, Long userId);
     List<Repository> findByUserIdOrderByCreatedAtDesc(Long userId);
+    List<Repository> findByUrlAndUserIdIsNull(String url);
+    List<Repository> findByUrlAndUserIdIsNotNull(String url); 
 }

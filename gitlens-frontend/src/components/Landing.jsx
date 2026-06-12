@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { submitRepo, pollStatus, fetchRepoData } from '../utils/api.js'
 import { mapBackendData } from '../utils/backendMapper.js'
 import { loadRepo, parseRepoUrl } from '../utils/github.js'
-import { analyzeForUser } from '../utils/authApi.js'
+import { analyzeForUser} from '../utils/authApi.js'
 import { MOCK } from '../utils/mockData.js'
 import { useIsMobile } from '../utils/useIsMobile.js'
 import AuthModal from './AuthModal.jsx'
@@ -49,41 +49,16 @@ export default function Landing({ onAnalyze, auth, onLogin, onLogout }) {
     // ── Logged-in path ────────────────────────────────────────────────────────
     if (auth) {
 
-      // 1. Check if user already has a COMPLETED record — skip everything
-      try {
-        setStep('Checking your saved analyses…'); setProgress(5)
-        const check = await analyzeForUser(canonicalUrl, auth.token)
-        if (check.cached && check.status === 'COMPLETED') {
-          setStep('Loading cached results…'); setProgress(90)
-          const rawData = await fetchRepoData(check.repositoryId)
-          const fakeStatus = { id: check.repositoryId, status: 'COMPLETED' }
-          const dashData = mapBackendData(canonicalUrl, fakeStatus, rawData)
-          onAnalyze({ ...dashData, token: ghToken.trim() || null })
-          return
-        }
-        // If a new parse was kicked off, poll it
-        if (!check.cached) {
-          await pollStatus(check.repositoryId, (msg, pct) => { setStep(msg); setProgress(pct) })
-          setStep('Loading analytics…'); setProgress(95)
-          const rawData = await fetchRepoData(check.repositoryId)
-          const fakeStatus = { id: check.repositoryId, status: 'COMPLETED' }
-          const dashData = mapBackendData(canonicalUrl, fakeStatus, rawData)
-          onAnalyze({ ...dashData, token: ghToken.trim() || null })
-          return
-        }
-      } catch (_) {
-        // Fall through to GitHub API
-      }
-
-      // 2. Not cached — use GitHub API for rich data, save bookmark after
+      // 1. GitHub API first (fast) — works for new AND cached repos
       if (parsed) {
         try {
           setStep('Fetching from GitHub…'); setProgress(10)
           const data = await loadRepo(
             parsed.owner, parsed.repo, ghToken.trim() || null,
-            (msg, pct) => { setStep(msg); setProgress(pct) }
+            (msg, pct) => { setStep(msg); setProgress(pct) },
+            auth.token  // ← pass JWT token
           )
-          // Save bookmark to user account (awaited so it shows in My Repos immediately)
+          // Save bookmark after — non-blocking
           setStep('Saving to your account…'); setProgress(97)
           try { await analyzeForUser(canonicalUrl, auth.token) } catch (_) {}
           onAnalyze({ ...data, token: ghToken.trim() || null })
@@ -92,18 +67,21 @@ export default function Landing({ onAnalyze, auth, onLogin, onLogout }) {
           if (!e.message.includes('403') && !e.message.includes('401')) {
             setError(e.message); setLoading(false); return
           }
-          setStep('Rate limited — falling back to backend parse…'); setProgress(10)
+          // Rate limited — fall back to JGit
+          setStep('Rate limited — using backend…'); setProgress(5)
         }
       }
 
-      // 3. Backend parse fallback for logged-in user
+      // 2. Rate-limited fallback only — JGit backend parse
       try {
         const result = await analyzeForUser(canonicalUrl, auth.token)
         const repoId = result.repositoryId
-        if (!result.cached) {
+        if (result.cached) {
+          setStep('Loading cached results…'); setProgress(90)
+        } else {
           await pollStatus(repoId, (msg, pct) => { setStep(msg); setProgress(pct) })
+          setStep('Loading analytics…'); setProgress(95)
         }
-        setStep('Loading analytics…'); setProgress(95)
         const rawData = await fetchRepoData(repoId)
         const fakeStatus = { id: repoId, status: 'COMPLETED' }
         const dashData = mapBackendData(canonicalUrl, fakeStatus, rawData)
@@ -113,8 +91,7 @@ export default function Landing({ onAnalyze, auth, onLogin, onLogout }) {
       }
       return
     }
-
-    // ── Guest path ────────────────────────────────────────────────────────────
+    // ── Guest path — GitHub API only, no DB writes ─────────
     if (parsed) {
       try {
         const data = await loadRepo(
@@ -124,23 +101,16 @@ export default function Landing({ onAnalyze, auth, onLogin, onLogout }) {
         onAnalyze({ ...data, token: ghToken.trim() || null })
         return
       } catch (e) {
-        if (!e.message.includes('403') && !e.message.includes('401')) {
-          setError(e.message); setLoading(false); return
-        }
-        setStep('Rate limited — using backend…'); setProgress(5)
+        setError(
+          e.message.includes('403') || e.message.includes('401')
+            ? 'GitHub rate limit hit. Add a GitHub token above, or log in to use backend parsing.'
+            : e.message
+        )
+        setLoading(false)
       }
-    }
-
-    try {
-      setStep('Submitting repository…'); setProgress(5)
-      const { repositoryId } = await submitRepo(raw)
-      const repoStatus = await pollStatus(repositoryId, (msg, pct) => { setStep(msg); setProgress(pct) })
-      setStep('Loading analytics…'); setProgress(95)
-      const rawData = await fetchRepoData(repositoryId)
-      const dashboardData = mapBackendData(raw, repoStatus, rawData)
-      onAnalyze({ ...dashboardData, token: ghToken.trim() || null })
-    } catch (e) {
-      setError(e.message); setLoading(false)
+    } else {
+      setError('Please enter a valid GitHub URL (e.g. github.com/owner/repo)')
+      setLoading(false)
     }
   }
 
