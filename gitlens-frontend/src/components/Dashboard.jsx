@@ -56,6 +56,7 @@ export default function Dashboard({ data, onReset }) {
   const [modalCommit, setModalCommit] = useState(null)
   const playRef = useRef()
   const token   = data.token || null
+  const jwtToken = data.jwtToken || null  
 
   const filteredCommits = useMemo(() => {
     return commits.filter(commit => {
@@ -259,7 +260,7 @@ export default function Dashboard({ data, onReset }) {
           )}
 
           {tab === 'insights' && (
-            <AIInsights data={data} token={token} />
+            <AIInsights data={data} token={jwtToken} />
           )}
 
         </div>

@@ -8,4 +8,5 @@ import java.util.Optional;
 public interface ContributorRepo extends JpaRepository<Contributor, Long> {
     Optional<Contributor> findByEmailAndRepositoryId(String email, Long repositoryId);
     List<Contributor> findByRepositoryIdOrderByTotalCommitsDesc(Long repositoryId);
+    void deleteByRepositoryId(Long repositoryId);
 }

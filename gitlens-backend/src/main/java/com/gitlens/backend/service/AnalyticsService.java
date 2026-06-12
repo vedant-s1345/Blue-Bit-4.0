@@ -117,20 +117,17 @@ public class AnalyticsService {
     @Transactional
     public void storeFromFrontend(StoreRepoRequest req, User user) {
         Long userId = user != null ? user.getId() : null;
+        if (userId == null) return; // guest — don't store
 
-        // Check if this user already has this repo saved
-        if (userId != null) {
-            Optional<Repository> existing = repositoryRepo.findByUrlAndUserId(req.getRepoUrl(), userId);
-            if (existing.isPresent() && "COMPLETED".equals(existing.get().getStatus())) return;
-        }
-
-        Repository repo = new Repository();
+        Optional<Repository> existing = repositoryRepo.findByUrlAndUserId(req.getRepoUrl(), userId);
+        
+        Repository repo = existing.orElse(new Repository());
         repo.setUrl(req.getRepoUrl());
         repo.setName(req.getRepoName());
         repo.setTotalCommits(req.getTotalCommits());
-        repo.setStatus("COMPLETED");
+        repo.setStatus("COMPLETED");  // always set to COMPLETED
         repo.setUserId(userId);
-        repo.setCreatedAt(LocalDateTime.now());
+        if (repo.getCreatedAt() == null) repo.setCreatedAt(LocalDateTime.now());
         repo.setAnalyzedAt(LocalDateTime.now());
         repositoryRepo.save(repo);
 
@@ -138,6 +135,7 @@ public class AnalyticsService {
 
         // Save contributors
         if (req.getContributors() != null && !req.getContributors().isEmpty()) {
+            contributorRepo.deleteByRepositoryId(savedRepo.getId());
             List<Contributor> contributors = req.getContributors().stream()
                 .map(c -> {
                     Contributor contributor = new Contributor();

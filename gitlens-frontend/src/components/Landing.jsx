@@ -59,9 +59,7 @@ export default function Landing({ onAnalyze, auth, onLogin, onLogout }) {
             auth.token  // ← pass JWT token
           )
           // Save bookmark after — non-blocking
-          setStep('Saving to your account…'); setProgress(97)
-          try { await analyzeForUser(canonicalUrl, auth.token) } catch (_) {}
-          onAnalyze({ ...data, token: ghToken.trim() || null })
+          onAnalyze({ ...data, token: ghToken.trim() || null, jwtToken: auth.token })
           return
         } catch (e) {
           if (!e.message.includes('403') && !e.message.includes('401')) {

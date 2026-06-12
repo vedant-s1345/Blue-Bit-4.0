@@ -32,7 +32,7 @@ export default function MyRepos({ auth, onAnalyze, onClose }) {
         (msg) => setStep(msg),
         auth.token   // pass JWT so store call updates contributors
       )
-      onAnalyze({ ...data, token: null })
+      onAnalyze({ ...data, token: null , jwtToken: auth.token })
     } catch (e) {
       setError(e.message || 'Failed to open repo')
       setOpening(null)
