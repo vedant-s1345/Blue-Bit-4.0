@@ -210,11 +210,18 @@ export default function RepoBot({ data }) {
       {/* ── Chat panel ── */}
       {open && (
         <div style={{
-          position: 'fixed', bottom: 92, right: 28, zIndex: 900,
-          width: 380, height: 520,
+          position: 'fixed',
+          bottom: 92,
+          right: 'max(12px, min(28px, 4vw))',
+          left: 'max(12px, min(28px, 4vw))',
+          zIndex: 900,
+          width: 'min(380px, calc(100vw - 24px))',
+          maxWidth: '100%',
+          height: 520,
           background: '#0c1424', border: '1px solid rgba(99,102,241,0.3)',
           borderRadius: 20, display: 'flex', flexDirection: 'column',
           boxShadow: '0 20px 60px rgba(0,0,0,0.7)',
+          margin: '0 auto',
         }}>
 
           {/* Header */}

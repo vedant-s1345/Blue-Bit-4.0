@@ -371,11 +371,13 @@ const S = {
   // Nav
   nav: {
     display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-    padding: '16px 32px',
+    flexWrap: 'wrap', gap: 10,
+    padding: '12px 16px',
     borderBottom: '1px solid rgba(255,255,255,0.05)',
     backdropFilter: 'blur(12px)',
     position: 'sticky', top: 0, zIndex: 100,
     background: 'rgba(2,6,23,0.8)',
+    minWidth: 0,
   },
   navBrand: { display: 'flex', alignItems: 'center', gap: 8 },
   navDiamond: { color: '#6366f1', fontSize: 16 },
@@ -384,8 +386,8 @@ const S = {
     background: 'linear-gradient(135deg,#f0f4ff,#a5b4fc)',
     WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
   },
-  navRight: { display: 'flex', alignItems: 'center', gap: 16 },
-  navUser: { display: 'flex', alignItems: 'center', gap: 10 },
+  navRight: { display: 'flex', alignItems: 'center', gap: 10, flexShrink: 1, minWidth: 0, flexWrap: 'wrap' },
+  navUser: { display: 'flex', alignItems: 'center', gap: 8, minWidth: 0, overflow: 'hidden' },
   avatar: {
     width: 34, height: 34, borderRadius: '50%',
     background: 'linear-gradient(135deg,#6366f1,#8b5cf6)',
@@ -394,7 +396,7 @@ const S = {
     fontFamily: "'Syne',sans-serif",
   },
   navName: { color: '#e2e8f0', fontWeight: 700, fontSize: 13, fontFamily: "'JetBrains Mono',monospace" },
-  navEmail: { color: '#334155', fontSize: 10, fontFamily: "'JetBrains Mono',monospace" },
+  navEmail: { color: '#334155', fontSize: 10, fontFamily: "'JetBrains Mono',monospace", overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 160 },
   logoutBtn: {
     background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)',
     color: '#f87171', fontSize: 11, padding: '6px 12px', borderRadius: 8,
@@ -454,12 +456,14 @@ const S = {
     border: '1px solid rgba(255,255,255,0.07)',
     borderRadius: 20, padding: '24px',
   },
-  analyseInputRow: { display: 'flex', gap: 10, marginBottom: 12 },
+  analyseInputRow: { display: 'flex', gap: 10, marginBottom: 12, flexWrap: 'wrap' },
   analyseInput: {
-    flex: 1, background: 'rgba(255,255,255,0.05)',
+    flex: 1, minWidth: 0,
+    background: 'rgba(255,255,255,0.05)',
     border: '1px solid rgba(255,255,255,0.1)', borderRadius: 10,
     outline: 'none', color: '#f1f5f9', fontSize: 14,
     padding: '12px 16px', fontFamily: "'JetBrains Mono',monospace",
+    width: '100%',
   },
   analyseBtn: {
     background: 'linear-gradient(135deg,#6366f1,#8b5cf6)',
