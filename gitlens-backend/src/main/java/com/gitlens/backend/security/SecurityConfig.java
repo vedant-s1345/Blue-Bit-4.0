@@ -38,6 +38,7 @@ public class SecurityConfig {
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers(org.springframework.http.HttpMethod.OPTIONS, "/**").permitAll() // ← ADD THIS
                 .requestMatchers(
+                    "/api/ping",
                     "/api/auth/**",
                     "/api/analyze",
                     "/api/status/**",
