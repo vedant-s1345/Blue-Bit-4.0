@@ -253,9 +253,9 @@ export default function Home({ auth, onAnalyze, onLogout }) {
                 return (
                   <div
                     key={repo.id}
-                    onClick={() => isReady && openRepo(repo)}
-                    style={{ ...S.repoCard, cursor: isReady ? 'pointer' : 'default' }}
-                    onMouseEnter={e => { if (isReady) e.currentTarget.style.borderColor = 'rgba(99,102,241,0.5)'; e.currentTarget.style.transform = 'translateY(-2px)' }}
+                    onClick={() => openRepo(repo)}
+                    style={{ ...S.repoCard, cursor: 'pointer' }}
+                    onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(99,102,241,0.5)'; e.currentTarget.style.transform = 'translateY(-2px)' }}
                     onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.07)'; e.currentTarget.style.transform = 'translateY(0)' }}
                   >
                     {/* Card top */}
@@ -302,9 +302,7 @@ export default function Home({ auth, onAnalyze, onLogout }) {
                         }} />
                         {isReady ? 'Ready' : repo.status}
                       </span>
-                      {isReady && (
-                        <span style={S.openHint}>Open →</span>
-                      )}
+                      <span style={S.openHint}>Open →</span>
                     </div>
                   </div>
                 )
